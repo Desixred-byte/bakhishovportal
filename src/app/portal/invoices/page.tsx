@@ -839,7 +839,7 @@ export default function InvoicesPage() {
     doc.roundedRect(margin, margin, contentWidth, pageHeight - margin * 2, 14, 14, "S");
 
     doc.setFillColor(...headerFill);
-    doc.roundedRect(margin + 14, margin + 14, contentWidth - 28, 140, 12, 12, "F");
+    doc.roundedRect(margin + 14, margin + 14, contentWidth - 28, 160, 12, 12, "F");
 
     if (invoiceLogo) {
       try {
