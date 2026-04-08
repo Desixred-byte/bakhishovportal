@@ -799,7 +799,7 @@ export default function InvoicesPage() {
 
   if (!client) return null;
 
-  async function createInvoicePdfDoc(project: InvoiceRecord["project"], invoice: InvoiceRecord["invoice"], meta?: InvoiceMeta) {
+  async function createInvoicePdfDoc(project: InvoiceRecord["project"], invoice: InvoiceRecord["invoice"], meta?: InvoiceMeta, clientInfo?: { brandName: string; whatsappNumber?: string; username?: string }) {
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
     const effectiveService = (meta?.serviceCategory || project.service || "").toLowerCase();
     const effectiveProjectLabel = effectiveService === "smm"
@@ -822,10 +822,10 @@ export default function InvoicesPage() {
       Math.min(totalAfterDiscount, invoice.paidAmount ?? (invoice.status === "paid" ? totalAfterDiscount : 0))
     );
     const balanceDue = Math.max(totalAfterDiscount - paidAmount, 0);
-    const billToName = toPdfSafeText(meta?.customerName || meta?.companyName || effectiveProjectLabel);
-    const billToCompany = toPdfSafeText(meta?.companyName || "");
-    const billToPhone = toPdfSafeText(meta?.customerPhone || "");
-    const billToAddress = toPdfSafeText(meta?.customerAddress || meta?.companyName || "Bakhishov Brands");
+    const billToName = toPdfSafeText(meta?.customerName || clientInfo?.username || meta?.companyName || effectiveProjectLabel);
+    const billToCompany = toPdfSafeText(meta?.companyName || clientInfo?.brandName || "");
+    const billToPhone = toPdfSafeText(meta?.customerPhone || clientInfo?.whatsappNumber || "");
+    const billToAddress = toPdfSafeText(meta?.customerAddress || clientInfo?.brandName || meta?.companyName || "Bakhishov Brands");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 30;
@@ -1040,11 +1040,15 @@ export default function InvoicesPage() {
     const project = activeInvoiceRecord?.project;
     const invoice = activeInvoiceRecord?.invoice;
 
-    if (!project || !invoice) return;
+    if (!project || !invoice || !client) return;
     isGeneratingInvoicePdfRef.current = true;
     setIsDownloadingPdf(true);
     try {
-      const doc = await createInvoicePdfDoc(project, invoice, invoice.metadata ?? undefined);
+      const doc = await createInvoicePdfDoc(project, invoice, invoice.metadata ?? undefined, {
+        brandName: client.brandName,
+        whatsappNumber: client.whatsappNumber,
+        username: client.username,
+      });
       doc.save(`${invoice.invoiceNumber}-${project.name.replace(/\s+/g, "-").toLowerCase()}.pdf`);
     } finally {
       isGeneratingInvoicePdfRef.current = false;
