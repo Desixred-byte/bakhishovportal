@@ -4650,289 +4650,280 @@ export default function OwnerPage() {
             )}
 
             {activeTab === "profiles" && (
-              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-6">
-                {/* Header with Create Button and View Toggle */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-white">Client Profiles</h2>
-                    <p className="mt-1 text-sm text-white/50">Manage all your client information and projects</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* View Toggle */}
-                    <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 p-1">
-                      <motion.button
-                        type="button"
-                        onClick={() => setProfilesViewMode("grid")}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`px-3 py-2 rounded-md text-sm font-semibold transition ${
-                          profilesViewMode === "grid"
-                            ? "bg-white/15 text-white"
-                            : "text-white/60 hover:text-white"
-                        }`}
-                      >
-                        ⊞ Grid
-                      </motion.button>
-                      <motion.button
-                        type="button"
-                        onClick={() => setProfilesViewMode("rows")}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`px-3 py-2 rounded-md text-sm font-semibold transition ${
-                          profilesViewMode === "rows"
-                            ? "bg-white/15 text-white"
-                            : "text-white/60 hover:text-white"
-                        }`}
-                      >
-                        ☰ Rows
-                      </motion.button>
+              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex gap-0 -mx-6 h-[calc(100vh-180px)]">
+                {/* Left Column - Context */}
+                <div className="flex-none w-64 border-r border-white/10 bg-black/40 px-6 py-6 overflow-y-auto">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-xs uppercase tracking-[0.14em] text-white/45 font-semibold">Admin Control Center</h3>
+                      <p className="mt-2 text-xl font-bold text-white">Client context</p>
+                      <p className="mt-2 text-xs text-white/50">Select a client once, then manage everything for that client across tabs.</p>
                     </div>
-
-                    {/* Create Button */}
-                    <motion.button
-                      type="button"
-                      onClick={() => {
-                        setProfileClientId("");
-                        setClientProfileDraft(createEmptyClientProfileDraft());
-                        setIsClientProfileOpen(true);
-                      }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="group relative h-12 rounded-xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 px-6 text-sm font-semibold text-white shadow-lg transition hover:border-white/30 hover:shadow-xl hover:shadow-white/10"
-                    >
-                      <span className="relative flex items-center gap-2">
-                        <span className="text-lg">+</span>
-                        New Profile
-                      </span>
-                    </motion.button>
                   </div>
                 </div>
 
-                {/* Clients Grid or Rows */}
-                {clients.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center"
-                  >
-                    <Users className="mx-auto mb-3 text-white/30" size={40} weight="light" />
-                    <p className="text-sm text-white/50">No client profiles yet. Create one to get started.</p>
-                  </motion.div>
-                ) : profilesViewMode === "grid" ? (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <AnimatePresence>
-                      {clients.map((client, idx) => {
-                        const clientProjects = projects.filter((p) => p.client_id === client.id);
-                        const activeProjects = clientProjects.filter((p) => p.status !== "delivered");
-                        const isPortalActive = inferPortalEnabled(client);
+                {/* Middle Column - Client List */}
+                <div className="flex-1 border-r border-white/10 bg-[#0a0a0a] overflow-y-auto">
+                  <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0a0a0a]/95 backdrop-blur-sm px-6 py-4">
+                    <h2 className="text-lg font-semibold tracking-tight text-white">Client Profiles</h2>
+                    <p className="mt-1 text-xs text-white/50">Manage all your client information and projects</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      <motion.button
+                        type="button"
+                        onClick={() => {
+                          setProfileClientId("");
+                          setClientProfileDraft(createEmptyClientProfileDraft());
+                          setIsClientProfileOpen(true);
+                        }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="h-10 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 transition flex items-center justify-center gap-2"
+                      >
+                        <span>+</span>
+                        New
+                      </motion.button>
+                    </div>
+                  </div>
 
-                        return (
-                          <motion.button
-                            key={client.id}
-                            type="button"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            transition={{ duration: 0.3, delay: idx * 0.05 }}
-                            whileHover={{ y: -4 }}
-                            onClick={() => {
-                              setSelectedClientForDetails(client.id);
-                              setShowClientDetailsPanel(true);
-                            }}
-                            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-5 text-left transition hover:border-white/20"
-                          >
-                            {/* Background glow effect */}
-                            <div className="absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100">
-                              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent" />
-                            </div>
+                  <div className="space-y-1 p-4">
+                    {clients.length === 0 ? (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="py-12 px-4 text-center"
+                      >
+                        <Users className="mx-auto mb-3 text-white/20" size={32} weight="light" />
+                        <p className="text-xs text-white/40">No clients yet.</p>
+                      </motion.div>
+                    ) : (
+                      <AnimatePresence>
+                        {clients.map((client, idx) => {
+                          const isSelected = selectedClientForDetails === client.id;
+                          const clientProjects = projects.filter((p) => p.client_id === client.id);
+                          const isPortalActive = inferPortalEnabled(client);
 
-                            {/* Card content */}
-                            <div className="relative z-10 space-y-4">
-                              {/* Company name and portal status */}
+                          return (
+                            <motion.button
+                              key={client.id}
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ delay: idx * 0.05 }}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClientForDetails(client.id);
+                                setShowClientDetailsPanel(true);
+                              }}
+                              className={`w-full rounded-lg border transition-all duration-200 p-3 text-left group ${
+                                isSelected
+                                  ? "border-white/30 bg-white/10 shadow-lg shadow-white/10"
+                                  : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                              }`}
+                            >
                               <div className="space-y-2">
                                 <div className="flex items-start justify-between gap-2">
-                                  <h3 className="text-base font-semibold leading-tight text-white group-hover:text-white transition">
-                                    {client.brand_name}
-                                  </h3>
-                                  {isPortalActive && (
-                                    <motion.div
-                                      initial={{ scale: 0 }}
-                                      animate={{ scale: 1 }}
-                                      className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-100"
-                                    >
-                                      Portal
-                                    </motion.div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Representative info */}
-                              <div className="space-y-2 rounded-lg border border-white/8 bg-white/[0.02] p-3">
-                                <p className="text-[11px] uppercase tracking-wider text-white/40">Representative</p>
-                                <p className="text-sm text-white/80">{client.username || "—"}</p>
-                                <p className="text-xs text-white/50 truncate">{client.whatsapp_number || "No phone"}</p>
-                              </div>
-
-                              {/* Projects info */}
-                              <div className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
-                                <Package size={16} className="text-white/40" weight="fill" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[11px] uppercase tracking-wider text-white/40">Projects</p>
-                                  <div className="mt-1 flex items-center gap-1">
-                                    <span className="text-sm font-semibold text-white">{clientProjects.length}</span>
-                                    {activeProjects.length > 0 && (
-                                      <span className="text-xs text-white/50">
-                                        ({activeProjects.length} active)
-                                      </span>
-                                    )}
+                                  <div className="flex-1">
+                                    <h3 className="text-sm font-semibold text-white">{client.brand_name}</h3>
                                   </div>
-                                </div>
-                              </div>
-
-                              {/* Quick project list */}
-                              {clientProjects.length > 0 && (
-                                <div className="space-y-1 border-t border-white/8 pt-3">
-                                  <p className="text-[10px] uppercase tracking-wider text-white/40">Latest projects</p>
-                                  <div className="space-y-1">
-                                    {clientProjects.slice(0, 2).map((project) => (
-                                      <div
-                                        key={project.id}
-                                        className="flex items-center justify-between gap-2 rounded text-xs text-white/60 hover:text-white/80"
-                                      >
-                                        <span className="truncate">{project.name}</span>
-                                        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-white/50">
-                                          {project.service.slice(0, 3)}
-                                        </span>
-                                      </div>
-                                    ))}
-                                    {clientProjects.length > 2 && (
-                                      <p className="text-[10px] text-white/40 pt-1">+{clientProjects.length - 2} more</p>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Edit hint */}
-                              <div className="pt-2 text-center">
-                                <p className="text-[10px] uppercase tracking-wider text-white/30 group-hover:text-white/50 transition">
-                                  Click to edit
-                                </p>
-                              </div>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <AnimatePresence>
-                      {clients.map((client, idx) => {
-                        const clientProjects = projects.filter((p) => p.client_id === client.id);
-                        const activeProjects = clientProjects.filter((p) => p.status !== "delivered");
-                        const isPortalActive = inferPortalEnabled(client);
-
-                        return (
-                          <motion.button
-                            key={client.id}
-                            type="button"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.2, delay: idx * 0.03 }}
-                            whileHover={{ x: 4 }}
-                            onClick={() => {
-                              setSelectedClientForDetails(client.id);
-                              setShowClientDetailsPanel(true);
-                            }}
-                            className="group w-full rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-4 text-left transition hover:border-white/20 hover:bg-gradient-to-r hover:from-white/[0.08] hover:to-white/[0.03]"
-                          >
-                            <div className="flex items-center justify-between gap-4">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <h3 className="text-sm font-semibold text-white group-hover:text-white transition">
-                                    {client.brand_name}
-                                  </h3>
                                   {isPortalActive && (
-                                    <span className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-100">
+                                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded bg-emerald-400/20 text-emerald-300">
                                       Portal
                                     </span>
                                   )}
                                 </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-white/60">
-                                  <span>{client.username || "No representative"}</span>
+                                <div className="flex items-center gap-2 text-[10px] text-white/50">
+                                  <span className="truncate">{client.username || "—"}</span>
                                   <span>•</span>
-                                  <span>{client.whatsapp_number || "No phone"}</span>
-                                  <span>•</span>
-                                  <span className="text-white/50">{clientProjects.length} projects {activeProjects.length > 0 && `(${activeProjects.length} active)`}</span>
+                                  <span className="truncate">{client.whatsapp_number || "—"}</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-[10px] text-white/40">
+                                  <Package size={12} />
+                                  <span>{clientProjects.length} project{clientProjects.length !== 1 ? "s" : ""}</span>
                                 </div>
                               </div>
-                              <div className="shrink-0">
-                                <p className="text-[10px] uppercase tracking-wider text-white/30 group-hover:text-white/50 transition text-right">
-                                  Click to edit
-                                </p>
-                              </div>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </AnimatePresence>
+                            </motion.button>
+                          );
+                        })}
+                      </AnimatePresence>
+                    )}
                   </div>
-                )}
-
-                {/* Create new form - Alternative modal trigger */}
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-                  <div className="flex items-center justify-between gap-4 mb-4">
-                    <div>
-                      <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Quick create</h3>
-                      <p className="mt-1 text-xs text-white/50">Add a new client quickly</p>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <input
-                      value={newClientForm.brandName}
-                      onChange={(e) => setNewClientForm((p) => ({ ...p, brandName: e.target.value }))}
-                      placeholder="Company name"
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                    <input
-                      value={newClientForm.username}
-                      onChange={(e) => setNewClientForm((p) => ({ ...p, username: e.target.value }))}
-                      placeholder="Representative name"
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                    <input
-                      value={newClientForm.whatsapp}
-                      onChange={(e) => setNewClientForm((p) => ({ ...p, whatsapp: e.target.value }))}
-                      placeholder="WhatsApp number"
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                    <input
-                      value={newClientForm.password}
-                      onChange={(e) => setNewClientForm((p) => ({ ...p, password: e.target.value }))}
-                      placeholder="Password (optional)"
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                    <div className="sm:col-span-2">
-                      <button
-                        type="button"
-                        onClick={() => setNewClientForm((p) => ({ ...p, portalEnabled: !p.portalEnabled }))}
-                        className={`w-full h-11 rounded-xl text-sm font-semibold transition border ${newClientForm.portalEnabled ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"}`}
-                      >
-                        {newClientForm.portalEnabled ? "✓ Portal enabled" : "Portal disabled"}
-                      </button>
-                    </div>
-                  </div>
-                  <motion.button
-                    type="button"
-                    onClick={handleCreateClient}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="mt-4 w-full h-11 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition"
-                  >
-                    {t.createClient}
-                  </motion.button>
                 </div>
+
+                {/* Right Column - Details Panel */}
+                <AnimatePresence>
+                  {showClientDetailsPanel && selectedClientForDetails && (
+                    <motion.div
+                      key="client-details"
+                      initial={{ opacity: 0, x: 300 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 300 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex-none w-96 border-l border-white/10 bg-black/40 overflow-y-auto"
+                    >
+                      {/* Header */}
+                      <div className="sticky top-0 z-10 border-b border-white/10 bg-black/40 backdrop-blur-sm px-6 py-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client Profile</p>
+                            <h2 className="mt-1 text-lg font-semibold tracking-tight text-white">
+                              {(() => {
+                                const client = clients.find((c) => c.id === selectedClientForDetails);
+                                return client?.brand_name || "Loading...";
+                              })()}
+                            </h2>
+                          </div>
+                          <motion.button
+                            type="button"
+                            onClick={() => {
+                              setShowClientDetailsPanel(false);
+                              setSelectedClientForDetails(null);
+                            }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            className="text-white/50 hover:text-white transition"
+                          >
+                            <X size={20} weight="bold" />
+                          </motion.button>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="space-y-5 p-6">
+                        {(() => {
+                          const client = clients.find((c) => c.id === selectedClientForDetails);
+                          const clientInvoices = projectInvoices.filter((inv: InvoiceRow) => {
+                            const project = projects.find((p) => p.id === inv.project_id);
+                            return project?.client_id === selectedClientForDetails;
+                          });
+                          const isPortalActive = client ? inferPortalEnabled(client) : false;
+
+                          if (!client) return <p className="text-white/50 text-xs">Loading...</p>;
+
+                          return (
+                            <>
+                              {/* Client Info */}
+                              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wider text-white/45">Company</p>
+                                  <p className="mt-1 text-sm font-semibold text-white">{client.brand_name}</p>
+                                </div>
+                                <div className="space-y-2 text-xs">
+                                  <div>
+                                    <p className="uppercase tracking-wider text-white/45">Representative</p>
+                                    <p className="text-white/80">{client.username || "—"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="uppercase tracking-wider text-white/45">WhatsApp</p>
+                                    <p className="text-white/80">{client.whatsapp_number || "—"}</p>
+                                  </div>
+                                </div>
+                                {isPortalActive && (
+                                  <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/15 p-2">
+                                    <p className="text-[10px] text-emerald-100">✓ Portal access active</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Projects Summary */}
+                              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                                <p className="text-[10px] uppercase tracking-wider text-white/45 font-semibold">Projects</p>
+                                <div className="mt-3 grid gap-2 grid-cols-3">
+                                  <div className="rounded-lg bg-white/5 p-2 text-center">
+                                    <p className="text-lg font-bold text-white">{projects.filter((p) => p.client_id === client.id).length}</p>
+                                    <p className="mt-1 text-[9px] uppercase text-white/50">Total</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white/5 p-2 text-center">
+                                    <p className="text-lg font-bold text-blue-400">{projects.filter((p) => p.client_id === client.id && p.status !== "delivered").length}</p>
+                                    <p className="mt-1 text-[9px] uppercase text-white/50">Active</p>
+                                  </div>
+                                  <div className="rounded-lg bg-white/5 p-2 text-center">
+                                    <p className="text-lg font-bold text-emerald-400">{projects.filter((p) => p.client_id === client.id && p.status === "delivered").length}</p>
+                                    <p className="mt-1 text-[9px] uppercase text-white/50">Done</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Invoices */}
+                              <div className="space-y-2">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-white">Invoices ({clientInvoices.length})</h3>
+                                {clientInvoices.length > 0 ? (
+                                  <div className="space-y-1 max-h-[250px] overflow-y-auto">
+                                    <AnimatePresence>
+                                      {clientInvoices.slice(0, 5).map((invoice: InvoiceRow, idx: number) => (
+                                        <motion.button
+                                          key={invoice.id}
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          exit={{ opacity: 0, x: -10 }}
+                                          transition={{ delay: idx * 0.03 }}
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveTab("invoices");
+                                            setSelectedInvoiceId(invoice.id);
+                                            const project = projects.find((p) => p.id === invoice.project_id);
+                                            if (project) {
+                                              setSelectedClientId(project.client_id);
+                                              setSelectedProjectId(project.id);
+                                              persistOwnerSelection(project.client_id, project.id);
+                                            }
+                                          }}
+                                          className="group w-full rounded-lg border border-white/10 bg-white/[0.03] p-2 text-left text-xs transition hover:border-white/20 hover:bg-white/[0.05]"
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span className="font-medium text-white truncate">#{invoice.invoice_number}</span>
+                                            <span className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-semibold uppercase ${
+                                              invoice.status === "paid" ? "bg-emerald-400/20 text-emerald-200" :
+                                              invoice.status === "partial" ? "bg-yellow-400/20 text-yellow-200" :
+                                              "bg-red-400/20 text-red-200"
+                                            }`}>
+                                              {invoice.status}
+                                            </span>
+                                          </div>
+                                          <p className="mt-1 text-[9px] text-white/50">${invoice.amount.toLocaleString()}</p>
+                                        </motion.button>
+                                      ))}
+                                    </AnimatePresence>
+                                    {clientInvoices.length > 5 && (
+                                      <p className="text-[9px] text-white/40 p-2 text-center">+{clientInvoices.length - 5} more invoices</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="rounded-lg border border-dashed border-white/10 py-3 px-2 text-center">
+                                    <p className="text-[9px] text-white/40">No invoices</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Activity */}
+                              <div className="space-y-2 border-t border-white/10 pt-4">
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-white">Activity</h3>
+                                <div className="space-y-1 text-[9px]">
+                                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                                    <p className="uppercase text-white/40">Client Created</p>
+                                    <p className="text-white/60 mt-0.5">Profile established</p>
+                                  </div>
+                                  {clientInvoices.length > 0 && (
+                                    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
+                                      <p className="uppercase text-white/40">{clientInvoices.length} Invoice{clientInvoices.length !== 1 ? "s" : ""}</p>
+                                      <p className="text-white/60 mt-0.5">Total: ${clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + inv.amount, 0).toLocaleString()}</p>
+                                    </div>
+                                  )}
+                                  {clientInvoices.filter((inv: InvoiceRow) => (inv.paid_amount ?? 0) > 0).length > 0 && (
+                                    <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-2">
+                                      <p className="uppercase text-emerald-300">Payments</p>
+                                      <p className="text-emerald-100 mt-0.5">${clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + (inv.paid_amount ?? 0), 0).toLocaleString()}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
               </motion.div>
             )}
           </AnimatePresence>
