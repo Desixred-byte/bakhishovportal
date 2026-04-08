@@ -1096,9 +1096,9 @@ export default function InvoicesPage() {
 
         {!activeInvoiceRecord && (
         <>
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.visibleInvoices}</p>
+        <div className="mt-8 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4 sm:gap-3">
+          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.visibleInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`count-${filteredInvoices.length}`}
@@ -1106,14 +1106,14 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-4 text-3xl font-semibold tracking-tight text-white"
+                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {filteredInvoices.length}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.openBalance}</p>
+          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.openBalance}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`open-${openBalance}`}
@@ -1121,14 +1121,14 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-4 text-3xl font-semibold tracking-tight text-white"
+                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {formatAzn(openBalance)}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-3xl border border-amber-400/20 bg-amber-400/12 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.paidTotal}</p>
+          <div className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/12 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.paidTotal}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`paid-${paidTotal}`}
@@ -1136,14 +1136,14 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-4 text-3xl font-semibold tracking-tight text-white"
+                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {formatAzn(paidTotal)}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.overdueInvoices}</p>
+          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.overdueInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`overdue-${overdueCount}`}
@@ -1151,7 +1151,7 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-4 text-3xl font-semibold tracking-tight text-white"
+                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {overdueCount}
               </motion.p>
