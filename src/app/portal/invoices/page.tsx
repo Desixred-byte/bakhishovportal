@@ -497,11 +497,11 @@ function PremiumFilterSelect({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className="mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-white/15 bg-[#0d1119] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.38)] sm:absolute sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0"
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 300, damping: 26, mass: 0.9 }}
+            className="mt-2 max-h-64 w-full origin-top overflow-auto rounded-2xl border border-white/15 bg-[#0d1119] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.38)] sm:absolute sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0"
           >
             {options.map((option) => {
               const active = option.value === selectedValue;
@@ -1220,7 +1220,7 @@ export default function InvoicesPage() {
             initial={false}
             animate={isMobileFiltersOpen ? { opacity: 1, height: "auto", marginTop: 16 } : { opacity: 0, height: 0, marginTop: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="overflow-hidden sm:!opacity-100 sm:!h-auto sm:!mt-4"
+            className="overflow-hidden sm:!overflow-visible sm:!opacity-100 sm:!h-auto sm:!mt-4"
           >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
             <div className="relative min-w-0">
