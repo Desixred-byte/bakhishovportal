@@ -1097,6 +1097,8 @@ export default function OwnerPage() {
   const [profileClientId, setProfileClientId] = useState("");
   const [clientProfileDraft, setClientProfileDraft] = useState<ClientProfileDraft>(createEmptyClientProfileDraft());
   const [profilesViewMode, setProfilesViewMode] = useState<"grid" | "rows">("grid");
+  const [showClientDetailsPanel, setShowClientDetailsPanel] = useState(false);
+  const [selectedClientForDetails, setSelectedClientForDetails] = useState<string | null>(null);
 
   const [deliverableForm, setDeliverableForm] = useState({
     title: "",
@@ -4734,11 +4736,8 @@ export default function OwnerPage() {
                             transition={{ duration: 0.3, delay: idx * 0.05 }}
                             whileHover={{ y: -4 }}
                             onClick={() => {
-                              setSelectedClientId(client.id);
-                              const firstProject = projects.find((project) => project.client_id === client.id)?.id ?? "";
-                              setSelectedProjectId(firstProject);
-                              persistOwnerSelection(client.id, firstProject);
-                              openClientProfile(client);
+                              setSelectedClientForDetails(client.id);
+                              setShowClientDetailsPanel(true);
                             }}
                             className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-5 text-left transition hover:border-white/20"
                           >
@@ -4843,11 +4842,8 @@ export default function OwnerPage() {
                             transition={{ duration: 0.2, delay: idx * 0.03 }}
                             whileHover={{ x: 4 }}
                             onClick={() => {
-                              setSelectedClientId(client.id);
-                              const firstProject = projects.find((project) => project.client_id === client.id)?.id ?? "";
-                              setSelectedProjectId(firstProject);
-                              persistOwnerSelection(client.id, firstProject);
-                              openClientProfile(client);
+                              setSelectedClientForDetails(client.id);
+                              setShowClientDetailsPanel(true);
                             }}
                             className="group w-full rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-4 text-left transition hover:border-white/20 hover:bg-gradient-to-r hover:from-white/[0.08] hover:to-white/[0.03]"
                           >
@@ -5399,6 +5395,195 @@ export default function OwnerPage() {
               </motion.div>
             </motion.div>
           )}
+
+          {/* Client Details Panel - Like Invoice Details */}
+          <AnimatePresence>
+            {showClientDetailsPanel && selectedClientForDetails && (
+              <motion.div
+                key="client-details"
+                initial={{ opacity: 0, x: 400 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 400 }}
+                transition={{ duration: 0.3, type: "spring", damping: 25, stiffness: 200 }}
+                className="fixed inset-y-0 right-0 z-40 w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#0a0a0a] shadow-[-10px_0_30px_rgba(0,0,0,0.5)]"
+              >
+                {/* Sticky Header */}
+                <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0a0a0a]/95 backdrop-blur-sm px-6 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client Profile</p>
+                      <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">
+                        {(() => {
+                          const client = clients.find((c) => c.id === selectedClientForDetails);
+                          return client?.brand_name || "Loading...";
+                        })()}
+                      </h2>
+                    </div>
+                    <motion.button
+                      type="button"
+                      onClick={() => {
+                        setShowClientDetailsPanel(false);
+                        setSelectedClientForDetails(null);
+                      }}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      className="text-white/50 hover:text-white transition"
+                    >
+                      <X size={24} weight="bold" />
+                    </motion.button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="space-y-6 p-6">
+                  {(() => {
+                    const client = clients.find((c) => c.id === selectedClientForDetails);
+                    const clientInvoices = projectInvoices.filter((inv: InvoiceRow) => {
+                      const project = projects.find((p) => p.id === inv.project_id);
+                      return project?.client_id === selectedClientForDetails;
+                    });
+                    const isPortalActive = client ? inferPortalEnabled(client) : false;
+
+                    if (!client) return <p className="text-white/50">Loading client details...</p>;
+
+                    return (
+                      <>
+                        {/* Client Info Card */}
+                        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-4">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-wider text-white/45">Company</p>
+                            <p className="mt-2 text-lg font-semibold text-white">{client.brand_name}</p>
+                          </div>
+                          <div className="grid gap-4 grid-cols-2">
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-white/45">Representative</p>
+                              <p className="mt-1 text-sm text-white/80">{client.username || "—"}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wider text-white/45">WhatsApp</p>
+                              <p className="mt-1 text-sm text-white/80">{client.whatsapp_number || "—"}</p>
+                            </div>
+                          </div>
+                          {isPortalActive && (
+                            <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/15 p-3">
+                              <p className="text-xs text-emerald-100">✓ Portal access active</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Projects Summary */}
+                        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                          <p className="text-[11px] uppercase tracking-wider text-white/45 font-semibold">Projects</p>
+                          <div className="mt-3 grid gap-3 grid-cols-3">
+                            <div className="rounded-lg bg-white/5 p-3 text-center">
+                              <p className="text-2xl font-bold text-white">{projects.filter((p) => p.client_id === client.id).length}</p>
+                              <p className="mt-1 text-[10px] uppercase text-white/50">Total</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-3 text-center">
+                              <p className="text-2xl font-bold text-blue-400">{projects.filter((p) => p.client_id === client.id && p.status !== "delivered").length}</p>
+                              <p className="mt-1 text-[10px] uppercase text-white/50">Active</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-3 text-center">
+                              <p className="text-2xl font-bold text-emerald-400">{projects.filter((p) => p.client_id === client.id && p.status === "delivered").length}</p>
+                              <p className="mt-1 text-[10px] uppercase text-white/50">Done</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Invoices Section */}
+                        <div className="space-y-3">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Invoices ({clientInvoices.length})</h3>
+                          {clientInvoices.length > 0 ? (
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                              <AnimatePresence>
+                                {clientInvoices.map((invoice: InvoiceRow, idx: number) => (
+                                  <motion.button
+                                    key={invoice.id}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: -20 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveTab("invoices");
+                                      setSelectedInvoiceId(invoice.id);
+                                      const project = projects.find((p) => p.id === invoice.project_id);
+                                      if (project) {
+                                        setSelectedClientId(project.client_id);
+                                        setSelectedProjectId(project.id);
+                                        persistOwnerSelection(project.client_id, project.id);
+                                      }
+                                      setShowClientDetailsPanel(false);
+                                    }}
+                                    className="group w-full rounded-lg border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-3 text-left transition hover:border-white/20 hover:from-white/[0.08] hover:to-white/[0.03]"
+                                  >
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-white truncate">Invoice #{invoice.invoice_number}</p>
+                                        <div className="mt-1 flex items-center gap-2 text-[10px] text-white/50">
+                                          <FileText size={12} />
+                                          <span>{(() => {
+                                            const proj = projects.find((p) => p.id === invoice.project_id);
+                                            return proj?.name || "Unknown project";
+                                          })()}</span>
+                                        </div>
+                                      </div>
+                                      <div className="shrink-0 text-right">
+                                        <p className="text-sm font-semibold text-white">${invoice.amount.toLocaleString()}</p>
+                                        <span className={`inline-block mt-1 px-2 py-1 rounded text-[10px] font-semibold uppercase ${
+                                          invoice.status === "paid" ? "bg-emerald-400/20 text-emerald-200" :
+                                          invoice.status === "partial" ? "bg-yellow-400/20 text-yellow-200" :
+                                          "bg-red-400/20 text-red-200"
+                                        }`}>
+                                          {invoice.status}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </motion.button>
+                                ))}
+                              </AnimatePresence>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border border-dashed border-white/10 py-6 px-4 text-center">
+                              <p className="text-sm text-white/50">No invoices yet</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Activity Log */}
+                        <div className="space-y-3 border-t border-white/10 pt-6">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Activity</h3>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                              <p className="text-[10px] uppercase tracking-wider text-white/40">Client Created</p>
+                              <p className="mt-1 text-xs text-white/70">Profile established</p>
+                            </div>
+                            {clientInvoices.map((invoice: InvoiceRow) => (
+                              <div key={invoice.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                                <p className="text-[10px] uppercase tracking-wider text-white/40">Invoice #{invoice.invoice_number} Created</p>
+                                <p className="mt-1 text-xs text-white/70">${invoice.amount.toLocaleString()} • {invoice.status.toUpperCase()}</p>
+                                {invoice.issue_date && (
+                                  <p className="mt-1 text-[10px] text-white/50">{new Date(invoice.issue_date).toLocaleDateString()}</p>
+                                )}
+                              </div>
+                            ))}
+                            {clientInvoices.filter((inv: InvoiceRow) => (inv.paid_amount ?? 0) > 0).length > 0 && (
+                              <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+                                <p className="text-[10px] uppercase tracking-wider text-emerald-300">Payments Received</p>
+                                <p className="mt-1 text-xs text-emerald-100">
+                                  Total: ${clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + (inv.paid_amount ?? 0), 0).toLocaleString()}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
         </main>
