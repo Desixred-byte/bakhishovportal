@@ -482,16 +482,18 @@ function PremiumFilterSelect({
       <button
         type="button"
         onClick={onToggle}
-        className="group flex h-11 w-full items-center justify-between rounded-2xl border border-white/15 bg-black/20 px-4 transition-all duration-200 hover:border-white/25 hover:bg-black/30"
+        className="group flex h-12 w-full items-center justify-between rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-all duration-200 hover:border-white/20 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/15"
       >
         <span className="min-w-0 text-left">
-          <span className="block text-[10px] uppercase tracking-[0.12em] text-white/45">{label}</span>
-          <span title={valueLabel} className="block truncate text-sm font-semibold tracking-tight text-white">{valueLabel}</span>
+          <span className="block text-[9px] uppercase tracking-[0.18em] text-white/38">{label}</span>
+          <span title={valueLabel} className="block truncate text-sm font-medium tracking-tight text-white/92">{valueLabel}</span>
         </span>
-        <CaretDown
-          className={`h-4 w-4 flex-none text-white/60 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
-          weight="bold"
-        />
+        <span className="ml-3 flex h-7 w-7 flex-none items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/65 transition-all duration-200 group-hover:border-white/15 group-hover:bg-white/[0.05] group-hover:text-white">
+          <CaretDown
+            className={`h-3.5 w-3.5 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
+            weight="bold"
+          />
+        </span>
       </button>
 
       <AnimatePresence>
@@ -501,7 +503,7 @@ function PremiumFilterSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 300, damping: 26, mass: 0.9 }}
-            className="mt-2 max-h-64 w-full origin-top overflow-auto rounded-2xl border border-white/15 bg-[#0d1119] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.38)] sm:absolute sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0"
+            className="mt-2 max-h-64 w-full origin-top overflow-auto rounded-[20px] border border-white/10 bg-[#0b0f17]/96 p-2 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:absolute sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0"
           >
             {options.map((option) => {
               const active = option.value === selectedValue;
@@ -510,10 +512,10 @@ function PremiumFilterSelect({
                   key={option.value}
                   type="button"
                   onClick={() => onSelect(option.value)}
-                  className={`w-full rounded-2xl px-3.5 py-2.5 text-left text-sm font-medium transition-all duration-150 ${
+                  className={`w-full rounded-[14px] px-3.5 py-2.5 text-left text-sm font-medium transition-all duration-150 ${
                     active
-                      ? "bg-white/10 text-white"
-                      : "text-white/75 hover:bg-white/5 hover:text-white"
+                      ? "bg-white/[0.08] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                      : "text-white/72 hover:bg-white/[0.04] hover:text-white"
                   }`}
                 >
                   {option.label}
@@ -1280,13 +1282,15 @@ export default function InvoicesPage() {
               <button
                 type="button"
                 onClick={() => setOpenFilter((value) => (value === "date" ? null : "date"))}
-                className="flex h-11 w-full items-center justify-between rounded-2xl border border-white/15 bg-black/20 px-4 transition-all duration-200 hover:border-white/25 hover:bg-black/30"
+                className="group flex h-12 w-full items-center justify-between rounded-[18px] border border-white/10 bg-white/[0.03] px-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition-all duration-200 hover:border-white/20 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/15"
               >
                 <span className="min-w-0 text-left">
-                  <span className="block text-[10px] uppercase tracking-[0.12em] text-white/45">{copy.date}</span>
-                  <span title={dateLabel} className="block truncate text-sm font-semibold tracking-tight text-white">{dateLabel}</span>
+                  <span className="block text-[9px] uppercase tracking-[0.18em] text-white/38">{copy.date}</span>
+                  <span title={dateLabel} className="block truncate text-sm font-medium tracking-tight text-white/92">{dateLabel}</span>
                 </span>
-                <CalendarBlank className="h-4 w-4 flex-none text-white/60" weight="bold" />
+                <span className="ml-3 flex h-7 w-7 flex-none items-center justify-center rounded-full border border-white/10 bg-black/20 text-white/65 transition-all duration-200 group-hover:border-white/15 group-hover:bg-white/[0.05] group-hover:text-white">
+                  <CalendarBlank className="h-3.5 w-3.5" weight="bold" />
+                </span>
               </button>
 
               <AnimatePresence>
@@ -1296,7 +1300,7 @@ export default function InvoicesPage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 340, damping: 28 }}
-                    className="mt-2 w-full rounded-2xl border border-white/15 bg-[#0d1119] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:absolute sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[min(340px,calc(100vw-2rem))]"
+                    className="mt-2 w-full rounded-[20px] border border-white/10 bg-[#0b0f17]/96 p-5 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:absolute sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[min(340px,calc(100vw-2rem))]"
                   >
                     <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.issueDateRange}</p>
 
@@ -1307,7 +1311,7 @@ export default function InvoicesPage() {
                           type="date"
                           value={issueFrom}
                           onChange={(event) => setIssueFrom(event.target.value)}
-                          className="mt-1 h-11 w-full rounded-2xl border border-white/15 bg-black/20 px-4 text-sm font-medium text-white outline-none transition-all duration-200 focus:border-white/30 [color-scheme:dark]"
+                          className="mt-1 h-11 w-full rounded-[16px] border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white outline-none transition-all duration-200 focus:border-white/20 focus:bg-white/[0.05] [color-scheme:dark]"
                         />
                       </div>
 
@@ -1317,7 +1321,7 @@ export default function InvoicesPage() {
                           type="date"
                           value={issueTo}
                           onChange={(event) => setIssueTo(event.target.value)}
-                          className="mt-1 h-11 w-full rounded-2xl border border-white/15 bg-black/20 px-4 text-sm font-medium text-white outline-none transition-all duration-200 focus:border-white/30 [color-scheme:dark]"
+                          className="mt-1 h-11 w-full rounded-[16px] border border-white/10 bg-white/[0.03] px-4 text-sm font-medium text-white outline-none transition-all duration-200 focus:border-white/20 focus:bg-white/[0.05] [color-scheme:dark]"
                         />
                       </div>
                     </div>
