@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   },
   description: "Bakhishov Brands client portal for project progress, invoices, deliverables, and support in one secure workspace.",
   icons: {
-    icon: "/BAKHISHOV.png",
-    shortcut: "/BAKHISHOV.png",
-    apple: "/BAKHISHOV.png",
+    icon: "/inv.png",
+    shortcut: "/inv.png",
+    apple: "/inv.png",
   },
   openGraph: {
     title: "Bakhishov Brands Portal",
