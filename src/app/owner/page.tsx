@@ -1,10 +1,11 @@
 "use client";
 
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "framer-motion";
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDots, CaretDown, ChartBar, Check, DotsThreeOutline, FileText, FunnelSimple, GearSix, House, MagnifyingGlass, Package, ShieldCheck, SlidersHorizontal, SpeakerHigh, Users, X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
+import { formatAzn } from "@/lib/currency";
 import type { ProjectStatus, ServiceType } from "@/lib/types";
 
 type OwnerLanguage = "en" | "ru" | "az";
@@ -55,6 +56,10 @@ type ClientOption = {
   password: string;
   whatsapp_number: string;
   portal_enabled?: boolean;
+  notes?: string | null;
+  source?: string | null;
+  preferred_language?: string | null;
+  preferred_currency?: string | null;
 };
 
 type ProjectOption = {
@@ -150,6 +155,10 @@ type ClientProfileDraft = {
   portalEnabled: boolean;
   portalUsername: string;
   portalPassword: string;
+  notes: string;
+  source: string;
+  preferredLanguage: string;
+  preferredCurrency: string;
 };
 
 type DeliverableRow = {
@@ -174,6 +183,7 @@ type SessionRow = {
 };
 
 const serviceOptions: ServiceType[] = ["website", "smm", "software", "app", "branding"];
+type InvoiceServiceFilter = "all" | ServiceType | "misc";
 const projectStatusOptions: ProjectStatus[] = ["planning", "in_progress", "review", "delivered"];
 const invoiceStatusOptions = ["unpaid", "partial", "paid"] as const;
 const tabs: OwnerTab[] = ["overview", "status", "invoices", "materials", "smm", "profiles", "security", "setup"];
@@ -514,6 +524,10 @@ function createEmptyClientProfileDraft(): ClientProfileDraft {
     portalEnabled: false,
     portalUsername: "",
     portalPassword: "",
+    notes: "",
+    source: "",
+    preferredLanguage: "az",
+    preferredCurrency: "AZN",
   };
 }
 
@@ -689,10 +703,22 @@ function inferPortalEnabled(client: ClientOption) {
   return hasCredentials && !disabledByPassword;
 }
 
+function normalizeInvoiceServiceFilterValue(raw: string | null | undefined, fallback: ServiceType | "misc" = "website"): ServiceType | "misc" {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (normalized === "misc" || normalized === "miscellaneous") return "misc";
+  if ((serviceOptions as string[]).includes(normalized)) return normalized as ServiceType;
+  return "misc";
+}
+
+function normalizeInvoiceServiceDraftValue(raw: string | null | undefined, fallback: ServiceType = "website"): ServiceType {
+  const normalized = normalizeInvoiceServiceFilterValue(raw, fallback);
+  return normalized === "misc" ? fallback : normalized;
+}
+
 function inferInvoiceMeta(invoice: InvoiceRow) {
   const metadata = invoice.metadata ?? {};
-  const normalizedMetaService = (metadata.serviceCategory ?? "").toLowerCase();
-  const serviceCategory = normalizedMetaService || invoice.project_service || "website";
+  const serviceCategory = normalizeInvoiceServiceFilterValue(metadata.serviceCategory, invoice.project_service ?? "website");
   const fallbackProjectLabel = serviceCategory === "smm"
     ? (invoice.project_name ?? "Unknown project").replace(/\s*\(smm\)\s*$/i, "")
     : (invoice.project_name ?? "Unknown project");
@@ -1051,6 +1077,7 @@ export default function OwnerPage() {
   const [invoiceTargetProjectId, setInvoiceTargetProjectId] = useState("");
   const [invoiceEditProjectId, setInvoiceEditProjectId] = useState("");
   const [supportsPortalEnabled, setSupportsPortalEnabled] = useState<boolean | null>(null);
+  const [supportsClientOptionalFields, setSupportsClientOptionalFields] = useState<boolean | null>(null);
   const [lastScopedSelection, setLastScopedSelection] = useState<{ clientId: string; projectId: string }>({ clientId: "", projectId: "" });
 
   const [notice, setNotice] = useState<string | null>(null);
@@ -1073,12 +1100,14 @@ export default function OwnerPage() {
   const [invoiceMetaMap, setInvoiceMetaMap] = useState<Record<string, InvoiceMeta>>({});
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<"all" | InvoiceRow["status"]>("all");
-  const [invoiceServiceFilter, setInvoiceServiceFilter] = useState<"all" | ServiceType>("all");
+  const [invoiceServiceFilter, setInvoiceServiceFilter] = useState<InvoiceServiceFilter>("all");
   const [invoicePage, setInvoicePage] = useState(1);
   const [invoicePageSize, setInvoicePageSize] = useState(10);
   const [invoiceFilterModal, setInvoiceFilterModal] = useState<"status" | "service" | "pageSize" | null>(null);
   const [isMobileInvoiceViewport, setIsMobileInvoiceViewport] = useState(false);
   const mobileInvoiceScrollYRef = useRef<number | null>(null);
+  const adminDataNormalizationRanRef = useRef(false);
+  const [isEditingProject, setIsEditingProject] = useState(false);
   const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery);
   const deferredInvoiceStatusFilter = useDeferredValue(invoiceStatusFilter);
   const deferredInvoiceServiceFilter = useDeferredValue(invoiceServiceFilter);
@@ -1099,6 +1128,26 @@ export default function OwnerPage() {
   const [profilesViewMode, setProfilesViewMode] = useState<"grid" | "rows">("grid");
   const [showClientDetailsPanel, setShowClientDetailsPanel] = useState(false);
   const [selectedClientForDetails, setSelectedClientForDetails] = useState<string | null>(null);
+  const [isInlineCreateClientMode, setIsInlineCreateClientMode] = useState(false);
+  const [isInlineEditClientMode, setIsInlineEditClientMode] = useState(false);
+  const [profileSearchQuery, setProfileSearchQuery] = useState("");
+  const [profileFilterMode, setProfileFilterMode] = useState<"all" | "portal" | "non-portal" | "with-invoices">("all");
+  const [overviewRange, setOverviewRange] = useState<"7d" | "30d" | "ytd" | "12m" | "custom" | "all">("30d");
+  const [overviewCustomRange, setOverviewCustomRange] = useState(() => {
+    const end = new Date();
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 29);
+    return {
+      start: toInputDate(start.toISOString()),
+      end: toInputDate(end.toISOString()),
+    };
+  });
+  const [overviewMetric, setOverviewMetric] = useState<"received" | "invoiced">("received");
+  const [hoveredOverviewBar, setHoveredOverviewBar] = useState<null | {
+    label: string;
+    value: number;
+    metricLabel: string;
+    trendLabel: string;
+  }>(null);
 
   const [deliverableForm, setDeliverableForm] = useState({
     title: "",
@@ -1422,13 +1471,21 @@ export default function OwnerPage() {
     setLoading(true);
     setError(null);
 
-    const clientsReq =
-      supportsPortalEnabled === false
-        ? supabase.from("clients").select("id, brand_name, username, password, whatsapp_number").order("brand_name", { ascending: true })
-        : supabase.from("clients").select("id, brand_name, username, password, whatsapp_number, portal_enabled").order("brand_name", { ascending: true });
+    const fetchClients = async (includePortal: boolean, includeOptional: boolean) => {
+      const portalCols = includePortal ? ", portal_enabled" : "";
+      const optionalCols = includeOptional ? ", notes, source, preferred_language, preferred_currency" : "";
+
+      return (supabase.from("clients") as any)
+        // Dynamic column list based on schema support flags.
+        .select(`id, brand_name, username, password, whatsapp_number${portalCols}${optionalCols}`)
+        .order("brand_name", { ascending: true });
+    };
+
+    const initialIncludePortal = supportsPortalEnabled !== false;
+    const initialIncludeOptional = supportsClientOptionalFields !== false;
 
     const [{ data: initialClientRows, error: initialClientErr }, { data: projectRows, error: projectErr }, { count: invoiceCount }] = await Promise.all([
-      clientsReq,
+      fetchClients(initialIncludePortal, initialIncludeOptional),
       supabase.from("projects").select("id, client_id, name, service, status, progress, start_date, delivery_date, latest_update").order("name", { ascending: true }),
       supabase.from("invoices").select("id", { count: "exact", head: true }),
     ]);
@@ -1436,13 +1493,23 @@ export default function OwnerPage() {
     let clientRows = initialClientRows;
     let clientErr = initialClientErr;
 
-    if (supportsPortalEnabled !== false && initialClientErr?.code === "42703") {
-      setSupportsPortalEnabled(false);
-      const fallback = await supabase.from("clients").select("id, brand_name, username, password, whatsapp_number").order("brand_name", { ascending: true });
-      clientRows = (fallback.data ?? []).map((row) => ({ ...row, portal_enabled: null }));
-      clientErr = fallback.error;
-    } else if (supportsPortalEnabled !== false && !initialClientErr) {
-      setSupportsPortalEnabled(true);
+    if (initialClientErr?.code === "42703") {
+      if (supportsClientOptionalFields !== false) {
+        setSupportsClientOptionalFields(false);
+        const fallbackWithoutOptional = await fetchClients(initialIncludePortal, false);
+        clientRows = fallbackWithoutOptional.data;
+        clientErr = fallbackWithoutOptional.error;
+      }
+
+      if (clientErr?.code === "42703" && supportsPortalEnabled !== false) {
+        setSupportsPortalEnabled(false);
+        const fallbackWithoutPortal = await fetchClients(false, false);
+        clientRows = (fallbackWithoutPortal.data ?? []).map((row: any) => ({ ...row, portal_enabled: null }));
+        clientErr = fallbackWithoutPortal.error;
+      }
+    } else {
+      if (supportsPortalEnabled !== false) setSupportsPortalEnabled(true);
+      if (supportsClientOptionalFields !== false) setSupportsClientOptionalFields(true);
     }
 
     if (clientErr || projectErr) {
@@ -1451,15 +1518,251 @@ export default function OwnerPage() {
       return;
     }
 
-    const nextClients = (clientRows ?? []) as ClientOption[];
-    const nextProjects = (projectRows ?? []) as ProjectOption[];
+    let nextClients = (clientRows ?? []) as ClientOption[];
+    let nextProjects = (projectRows ?? []) as ProjectOption[];
+
+    let mergedFromClientId = "";
+    let mergedToClientId = "";
+
+    const normalizedJavarSource = nextClients.find((client) => {
+      const brand = (client.brand_name ?? "").trim().toLowerCase();
+      const username = (client.username ?? "").trim().toLowerCase();
+      const phone = normalizeWhatsappForStorage(client.whatsapp_number ?? "");
+
+      return (brand === "javar" || username === "javar.az") && (!phone || phone === "994" || phone === "9940");
+    });
+
+    const normalizedJavarTarget = nextClients.find((client) => {
+      const brand = (client.brand_name ?? "").trim().toLowerCase();
+      const username = (client.username ?? "").trim().toLowerCase();
+      const phone = normalizeWhatsappForStorage(client.whatsapp_number ?? "");
+
+      return brand === "javar.az" && (username.includes("rufan") || phone === "994552380538");
+    });
+
+    if (normalizedJavarSource && normalizedJavarTarget && normalizedJavarSource.id !== normalizedJavarTarget.id) {
+      const sourceProjectsCount = nextProjects.filter((project) => project.client_id === normalizedJavarSource.id).length;
+
+      if (sourceProjectsCount > 0) {
+        const { error: mergeProjectsErr } = await supabase
+          .from("projects")
+          .update({ client_id: normalizedJavarTarget.id })
+          .eq("client_id", normalizedJavarSource.id);
+
+        if (!mergeProjectsErr) {
+          const { data: mergedProjectRows, error: mergedProjectErr } = await supabase
+            .from("projects")
+            .select("id, client_id, name, service, status, progress, start_date, delivery_date, latest_update")
+            .order("name", { ascending: true });
+
+          if (!mergedProjectErr) {
+            nextProjects = (mergedProjectRows ?? []) as ProjectOption[];
+            mergedFromClientId = normalizedJavarSource.id;
+            mergedToClientId = normalizedJavarTarget.id;
+            setSelectedClientForDetails((prev) => (prev === normalizedJavarSource.id ? normalizedJavarTarget.id : prev));
+          }
+        }
+      }
+    }
+
+    if (!adminDataNormalizationRanRef.current) {
+      adminDataNormalizationRanRef.current = true;
+
+      const projectColumns = "id, client_id, name, service, status, progress, start_date, delivery_date, latest_update";
+      const invoiceColumns = "id, project_id, invoice_number, amount, status, issue_date, due_date, metadata";
+
+      const canonicalJavarClient = nextClients.find((client) => {
+        const brand = (client.brand_name ?? "").trim().toLowerCase();
+        const username = (client.username ?? "").trim().toLowerCase();
+        return brand === "javar.az" || username === "javar.az";
+      });
+
+      let javarAppProjectId = "";
+
+      if (canonicalJavarClient) {
+        let javarProjects = nextProjects.filter((project) => project.client_id === canonicalJavarClient.id);
+
+        let javarWebsiteProject =
+          javarProjects.find((project) => project.name.trim().toLowerCase() === "javar.az")
+          ?? javarProjects.find((project) => project.service === "website")
+          ?? null;
+
+        if (!javarWebsiteProject) {
+          const { data: createdWebsiteProject } = await supabase
+            .from("projects")
+            .insert({
+              client_id: canonicalJavarClient.id,
+              name: "javar.az",
+              service: "website",
+              status: "in_progress",
+              progress: 0,
+              start_date: null,
+              delivery_date: null,
+              latest_update: "Website project normalized by admin.",
+            })
+            .select(projectColumns)
+            .single();
+
+          if (createdWebsiteProject) {
+            const typed = createdWebsiteProject as ProjectOption;
+            nextProjects = [typed, ...nextProjects];
+            javarProjects = [typed, ...javarProjects];
+            javarWebsiteProject = typed;
+          }
+        }
+
+        if (javarWebsiteProject && (javarWebsiteProject.name !== "javar.az" || javarWebsiteProject.service !== "website")) {
+          const { data: updatedWebsiteProject } = await supabase
+            .from("projects")
+            .update({ name: "javar.az", service: "website" })
+            .eq("id", javarWebsiteProject.id)
+            .select(projectColumns)
+            .single();
+
+          if (updatedWebsiteProject) {
+            const typed = updatedWebsiteProject as ProjectOption;
+            nextProjects = nextProjects.map((project) => (project.id === typed.id ? typed : project));
+            javarProjects = javarProjects.map((project) => (project.id === typed.id ? typed : project));
+          }
+        }
+
+        let javarAppProject =
+          javarProjects.find((project) => project.name.trim().toLowerCase() === "javarski update")
+          ?? javarProjects.find((project) => project.service === "app")
+          ?? null;
+
+        if (!javarAppProject) {
+          const { data: createdAppProject } = await supabase
+            .from("projects")
+            .insert({
+              client_id: canonicalJavarClient.id,
+              name: "Javarski update",
+              service: "app",
+              status: "in_progress",
+              progress: 0,
+              start_date: null,
+              delivery_date: null,
+              latest_update: "App project normalized by admin.",
+            })
+            .select(projectColumns)
+            .single();
+
+          if (createdAppProject) {
+            const typed = createdAppProject as ProjectOption;
+            nextProjects = [typed, ...nextProjects];
+            javarProjects = [typed, ...javarProjects];
+            javarAppProject = typed;
+          }
+        }
+
+        if (javarAppProject) {
+          javarAppProjectId = javarAppProject.id;
+          if (javarAppProject.name !== "Javarski update" || javarAppProject.service !== "app") {
+            const { data: updatedAppProject } = await supabase
+              .from("projects")
+              .update({ name: "Javarski update", service: "app" })
+              .eq("id", javarAppProject.id)
+              .select(projectColumns)
+              .single();
+
+            if (updatedAppProject) {
+              const typed = updatedAppProject as ProjectOption;
+              nextProjects = nextProjects.map((project) => (project.id === typed.id ? typed : project));
+            }
+          }
+        }
+      }
+
+      const { data: invoiceRowsForNormalization } = await supabase.from("invoices").select(invoiceColumns);
+      if (Array.isArray(invoiceRowsForNormalization) && invoiceRowsForNormalization.length > 0) {
+        const latestProjectMap = new Map(nextProjects.map((project) => [project.id, project]));
+        const invoiceRows = invoiceRowsForNormalization as InvoiceRow[];
+        const updates: Array<PromiseLike<unknown>> = [];
+
+        if (javarAppProjectId) {
+          const realJavarAppInvoice = invoiceRows.find((invoice) => (invoice.invoice_number ?? "").trim().toUpperCase() === "BBK-000045");
+
+          if (realJavarAppInvoice) {
+            const baseMeta = realJavarAppInvoice.metadata ?? {};
+            updates.push(
+              supabase
+                .from("invoices")
+                .update({
+                  project_id: javarAppProjectId,
+                  amount: 712,
+                  status: "paid",
+                  issue_date: "2026-02-25",
+                  due_date: "2026-02-25",
+                  metadata: {
+                    ...baseMeta,
+                    serviceCategory: "app",
+                    projectLabel: "Javarski update",
+                    companyName: "Javar.az",
+                    customerName: baseMeta.customerName || "Javar.az",
+                    customerAddress: baseMeta.customerAddress || "Nasimi, Baku, Azerbaijan",
+                    discountType: "percent",
+                    discountValue: 5,
+                    taxType: "none",
+                    taxValue: 0,
+                    items: [
+                      { id: "1", description: "Mobil Tətbiqin Hazırlanması (iOS və Android platformaları üzrə)", quantity: 1, rate: 254.13 },
+                      { id: "2", description: "Backend Sisteminin Qurulması və API İnteqrasiyası", quantity: 1, rate: 152.48 },
+                      { id: "3", description: "Baza Arxitektura Hazırlanması və Konfiqurasiyası", quantity: 1, rate: 152.48 },
+                      { id: "4", description: "UI/UX Dizaynın Hazırlanması və Optimallaşdırılması", quantity: 1, rate: 101.65 },
+                      { id: "5", description: "Texniki Dəstək, Test və Sistem Baxımı", quantity: 1, rate: 50.81 },
+                    ],
+                  },
+                })
+                .eq("id", realJavarAppInvoice.id)
+            );
+          }
+        }
+
+        invoiceRows.forEach((invoice) => {
+          if ((invoice.invoice_number ?? "").trim().toUpperCase() === "BBK-000045") return;
+
+          const projectExists = Boolean(invoice.project_id && latestProjectMap.has(invoice.project_id));
+          if (projectExists) return;
+
+          const currentMeta = invoice.metadata ?? {};
+          const currentService = normalizeInvoiceServiceFilterValue(currentMeta.serviceCategory, "misc");
+          if (currentService === "misc" && currentMeta.projectLabel) return;
+
+          updates.push(
+            supabase
+              .from("invoices")
+              .update({
+                metadata: {
+                  ...currentMeta,
+                  serviceCategory: "misc",
+                  projectLabel: currentMeta.projectLabel || "Miscellaneous",
+                  companyName: currentMeta.companyName || currentMeta.customerName || "Miscellaneous",
+                },
+              })
+              .eq("id", invoice.id)
+          );
+        });
+
+        if (updates.length > 0) {
+          await Promise.all(updates);
+        }
+      }
+
+      const { data: refreshedProjects } = await supabase.from("projects").select(projectColumns).order("name", { ascending: true });
+      if (Array.isArray(refreshedProjects)) {
+        nextProjects = refreshedProjects as ProjectOption[];
+      }
+    }
 
     setAllInvoiceCount(invoiceCount ?? 0);
 
     setClients(nextClients);
     setProjects(nextProjects);
 
-    const nextClientId = preferredClientId ?? selectedClientId ?? "";
+    let nextClientId = preferredClientId ?? selectedClientId ?? "";
+    if (mergedFromClientId && mergedToClientId && nextClientId === mergedFromClientId) {
+      nextClientId = mergedToClientId;
+    }
     const clientProjects = nextClientId ? nextProjects.filter((project) => project.client_id === nextClientId) : [];
 
     const nextProjectId =
@@ -1761,7 +2064,7 @@ export default function OwnerPage() {
       ...(invoiceMetaMap[invoice.id] ?? {}),
     };
     const inferred = inferInvoiceMeta(invoice);
-    const effectiveService = ((meta?.serviceCategory as ServiceType | undefined) ?? (inferred.serviceCategory as ServiceType)) || "website";
+    const effectiveService = normalizeInvoiceServiceDraftValue(meta?.serviceCategory ?? inferred.serviceCategory, "website");
     const effectiveProjectLabel = sanitizeProjectLabel(meta?.projectLabel ?? inferred.projectLabel);
     const fallbackItems = buildDefaultInvoiceLineItems(effectiveProjectLabel, effectiveService, Number(invoice.amount) || 0);
     const hasMeaningfulItems = Array.isArray(meta?.items) && meta.items.length > 0;
@@ -1779,7 +2082,7 @@ export default function OwnerPage() {
       dueDate: toInputDate(invoice.due_date),
       projectLabel: effectiveProjectLabel,
       companyName: meta?.companyName ?? inferred.companyName,
-      serviceCategory: (meta?.serviceCategory as ServiceType) ?? (inferred.serviceCategory as ServiceType),
+      serviceCategory: normalizeInvoiceServiceDraftValue(meta?.serviceCategory ?? inferred.serviceCategory, "website"),
       customerName: meta?.customerName ?? "",
       customerEmail: meta?.customerEmail ?? "",
       customerAddress: meta?.customerAddress ?? "",
@@ -2322,6 +2625,14 @@ export default function OwnerPage() {
       password: newClientForm.portalEnabled ? newClientForm.password.trim() : "",
       whatsapp_number: normalizeWhatsappForStorage(newClientForm.whatsapp.trim()),
       ...(supportsPortalEnabled ? { portal_enabled: newClientForm.portalEnabled } : {}),
+      ...(supportsClientOptionalFields
+        ? {
+            notes: "",
+            source: "",
+            preferred_language: language,
+            preferred_currency: "AZN",
+          }
+        : {}),
     };
 
     if (!payload.brand_name || !payload.whatsapp_number) {
@@ -2363,6 +2674,10 @@ export default function OwnerPage() {
       portalEnabled: inferred,
       portalUsername,
       portalPassword,
+      notes: client.notes ?? "",
+      source: client.source ?? "",
+      preferredLanguage: client.preferred_language ?? "az",
+      preferredCurrency: client.preferred_currency ?? "AZN",
     });
     setIsClientProfileOpen(true);
   }
@@ -2404,6 +2719,14 @@ export default function OwnerPage() {
         : `DISABLED::${cleanedPassword}`,
       whatsapp_number: normalizeWhatsappForStorage(clientProfileDraft.whatsappNumber),
       ...(supportsPortalEnabled ? { portal_enabled: clientProfileDraft.portalEnabled } : {}),
+      ...(supportsClientOptionalFields
+        ? {
+            notes: clientProfileDraft.notes.trim(),
+            source: clientProfileDraft.source.trim(),
+            preferred_language: clientProfileDraft.preferredLanguage,
+            preferred_currency: clientProfileDraft.preferredCurrency,
+          }
+        : {}),
     };
 
     if (!payload.brand_name || !payload.username || !payload.whatsapp_number) {
@@ -2432,6 +2755,192 @@ export default function OwnerPage() {
     setIsClientProjectsModalOpen(false);
     setProfileClientId("");
     await loadLists(targetClientId, selectedProjectId);
+  }
+
+  async function handleCreateClientFromProfileDraft() {
+    setNotice(null);
+    setError(null);
+
+    const companyName = clientProfileDraft.companyName.trim();
+    const representativeName = clientProfileDraft.representativeName.trim();
+    const portalUsername = clientProfileDraft.portalUsername.trim() || createPortalUsername(companyName, representativeName);
+    const cleanedPassword = clientProfileDraft.portalPassword.replace(/^DISABLED::/, "").trim() || createPortalPassword();
+
+    const payload = {
+      brand_name: companyName,
+      username: representativeName || portalUsername,
+      password: clientProfileDraft.portalEnabled ? cleanedPassword : `DISABLED::${cleanedPassword}`,
+      whatsapp_number: normalizeWhatsappForStorage(clientProfileDraft.whatsappNumber),
+      ...(supportsPortalEnabled ? { portal_enabled: clientProfileDraft.portalEnabled } : {}),
+      ...(supportsClientOptionalFields
+        ? {
+            notes: clientProfileDraft.notes.trim(),
+            source: clientProfileDraft.source.trim(),
+            preferred_language: clientProfileDraft.preferredLanguage,
+            preferred_currency: clientProfileDraft.preferredCurrency,
+          }
+        : {}),
+    };
+
+    if (!payload.brand_name || !payload.whatsapp_number) {
+      setError("Company and WhatsApp are required.");
+      return;
+    }
+
+    if (clientProfileDraft.portalEnabled && (!portalUsername || !cleanedPassword)) {
+      setError("Portal access requires username and password.");
+      return;
+    }
+
+    const { data, error: insertErr } = await supabase
+      .from("clients")
+      .insert(payload)
+      .select("id")
+      .single();
+
+    if (insertErr) {
+      setError(t.errorLoad);
+      return;
+    }
+
+    const createdClientId = data?.id ?? "";
+    setNotice(t.noticeCreated);
+    setSuccessPopup("Client created successfully");
+    setProfileClientId("");
+    setIsInlineCreateClientMode(false);
+    setIsInlineEditClientMode(false);
+    setClientProfileDraft(createEmptyClientProfileDraft());
+
+    await loadLists(createdClientId || selectedClientId, selectedProjectId);
+
+    if (createdClientId) {
+      setSelectedClientForDetails(createdClientId);
+      setSelectedClientId(createdClientId);
+      persistOwnerSelection(createdClientId, selectedProjectId);
+    }
+  }
+
+  async function handleSaveClientProfileInline() {
+    setNotice(null);
+    setError(null);
+
+    const targetClientId = profileClientId || selectedClientForDetails || selectedClientId;
+
+    if (!targetClientId) {
+      setError("Choose a client first.");
+      return;
+    }
+
+    const cleanedPassword = clientProfileDraft.portalPassword.replace(/^DISABLED::/, "").trim() || createPortalPassword();
+
+    const payload = {
+      brand_name: clientProfileDraft.companyName.trim(),
+      username: clientProfileDraft.portalUsername.trim() || createPortalUsername(clientProfileDraft.companyName, clientProfileDraft.representativeName),
+      password: clientProfileDraft.portalEnabled
+        ? cleanedPassword
+        : `DISABLED::${cleanedPassword}`,
+      whatsapp_number: normalizeWhatsappForStorage(clientProfileDraft.whatsappNumber),
+      ...(supportsPortalEnabled ? { portal_enabled: clientProfileDraft.portalEnabled } : {}),
+      ...(supportsClientOptionalFields
+        ? {
+            notes: clientProfileDraft.notes.trim(),
+            source: clientProfileDraft.source.trim(),
+            preferred_language: clientProfileDraft.preferredLanguage,
+            preferred_currency: clientProfileDraft.preferredCurrency,
+          }
+        : {}),
+    };
+
+    if (!payload.brand_name || !payload.username || !payload.whatsapp_number) {
+      setError("Company, representative and WhatsApp are required.");
+      return;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("clients")
+      .update(payload)
+      .eq("id", targetClientId);
+
+    if (updateErr) {
+      setError(t.errorLoad);
+      return;
+    }
+
+    setNotice("Client profile updated.");
+    setSuccessPopup("Profile saved successfully");
+    setIsInlineEditClientMode(false);
+    setProfileClientId("");
+    await loadLists(targetClientId, selectedProjectId);
+    setSelectedClientForDetails(targetClientId);
+  }
+
+  async function handleDeleteClientProfile(clientId: string) {
+    setNotice(null);
+    setError(null);
+
+    const clientProjects = projects.filter((project) => project.client_id === clientId);
+    const projectIds = clientProjects.map((project) => project.id);
+
+    if (projectIds.length > 0) {
+      const { error: deleteDeliverablesErr } = await supabase
+        .from("deliverables")
+        .delete()
+        .in("project_id", projectIds);
+
+      if (deleteDeliverablesErr) {
+        setError("Could not remove deliverables for this client.");
+        return;
+      }
+
+      const { error: deleteInvoicesErr } = await supabase
+        .from("invoices")
+        .delete()
+        .in("project_id", projectIds);
+
+      if (deleteInvoicesErr) {
+        setError("Could not remove invoices for this client.");
+        return;
+      }
+
+      const { error: deleteProjectsErr } = await supabase
+        .from("projects")
+        .delete()
+        .in("id", projectIds);
+
+      if (deleteProjectsErr) {
+        setError("Could not remove projects for this client.");
+        return;
+      }
+    }
+
+    const { error: deleteSessionsErr } = await supabase
+      .from("portal_sessions")
+      .delete()
+      .eq("client_id", clientId);
+
+    if (deleteSessionsErr) {
+      setError("Could not remove client sessions.");
+      return;
+    }
+
+    const { error: deleteClientErr } = await supabase
+      .from("clients")
+      .delete()
+      .eq("id", clientId);
+
+    if (deleteClientErr) {
+      setError("Could not delete client profile.");
+      return;
+    }
+
+    setNotice("Client deleted.");
+    setSuccessPopup("Client removed successfully");
+    setIsInlineEditClientMode(false);
+    setIsInlineCreateClientMode(false);
+    setProfileClientId("");
+    setSelectedClientForDetails(null);
+
+    await loadLists("", "");
   }
 
   async function handleCreateProject() {
@@ -2476,13 +2985,79 @@ export default function OwnerPage() {
     await loadLists(selectedClientId, data?.id);
   }
 
+  async function handleUpdateProject() {
+    setNotice(null);
+    setError(null);
+
+    if (!selectedProjectId) {
+      setError("No project selected.");
+      return;
+    }
+
+    const updatedProject = {
+      name: projectDraft.name.trim(),
+      service: projectDraft.service,
+      status: projectDraft.status,
+      progress: Number(projectDraft.progress) || 0,
+      start_date: projectDraft.startDate || null,
+      delivery_date: projectDraft.deliveryDate || null,
+      latest_update: projectDraft.latestUpdate.trim() || null,
+    };
+
+    const { error: updateErr } = await supabase
+      .from("projects")
+      .update(updatedProject)
+      .eq("id", selectedProjectId);
+
+    if (updateErr) {
+      setError(withErrorDetails("Could not update project.", updateErr));
+      return;
+    }
+
+    setNotice("Project updated.");
+    setIsEditingProject(false);
+    
+    // Reload lists to update projects state
+    await loadLists(selectedClientId, selectedProjectId);
+    
+    // Re-enrich invoices with updated project data
+    const clientProjectIds = projects
+      .filter((project) => project.client_id === selectedClientId)
+      .map((project) => project.id);
+    const scopedProjectIds = clientProjectIds.length > 0 ? clientProjectIds : [selectedProjectId];
+    
+    const updatedProjectMap = new Map(
+      projects.map((p) => [
+        p.id,
+        p.id === selectedProjectId ? { ...p, ...updatedProject } : p,
+      ] as const)
+    );
+
+    const { data: invoiceRows } = await supabase
+      .from("invoices")
+      .select("id, project_id, invoice_number, amount, status, issue_date, due_date, metadata, paid_amount")
+      .in("project_id", scopedProjectIds)
+      .order("issue_date", { ascending: false });
+
+    const enrichedInvoices = ((invoiceRows ?? []) as InvoiceRow[]).map((invoice) => {
+      const proj = updatedProjectMap.get(invoice.project_id);
+      return {
+        ...invoice,
+        project_name: proj?.name ?? "Unknown project",
+        project_service: proj?.service,
+      };
+    });
+
+    setProjectInvoices(enrichedInvoices);
+  }
+
   async function handleDeleteProject(projectId: string) {
     setNotice(null);
     setError(null);
 
     const { error: deleteErr } = await supabase.from("projects").delete().eq("id", projectId);
     if (deleteErr) {
-      setError(withErrorDetails("Could not delete project.", deleteErr));
+      setError(withErrorDetails("Could not delete project (invoices preserved).", deleteErr));
       return;
     }
 
@@ -2491,8 +3066,48 @@ export default function OwnerPage() {
       persistOwnerSelection(selectedClientId, "");
     }
 
-    setNotice("Project deleted.");
+    setNotice("Project deleted. Associated invoices preserved.");
     await loadLists(selectedClientId, selectedProjectId === projectId ? undefined : selectedProjectId);
+  }
+
+  async function handleMarkInvoiceAsMisc(invoiceId: string) {
+    setNotice(null);
+    setError(null);
+
+    const activeRow = projectInvoices.find((inv) => inv.id === invoiceId);
+    if (!activeRow) {
+      setError("Invoice not found.");
+      return;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("invoices")
+      .update({
+        metadata: {
+          ...(activeRow.metadata ?? {}),
+          serviceCategory: "misc",
+          projectLabel: activeRow.metadata?.projectLabel || "Miscellaneous",
+          companyName: activeRow.metadata?.companyName || activeRow.metadata?.customerName || "Miscellaneous",
+        },
+      })
+      .eq("id", invoiceId);
+
+    if (updateErr) {
+      setError(withErrorDetails("Could not mark as MISC.", updateErr));
+      return;
+    }
+
+    const nextMap: Record<string, InvoiceMeta> = {
+      ...invoiceMetaMap,
+      [invoiceId]: {
+        ...(invoiceMetaMap[invoiceId] ?? {}),
+        serviceCategory: "misc" as any,
+      },
+    };
+    persistInvoiceMeta(nextMap, activeRow.project_id);
+    setIsInvoiceActionsOpen(false);
+    setNotice("Invoice marked as MISC.");
+    await loadProjectResources(selectedProjectId);
   }
 
   async function handleSaveSmmUpdate() {
@@ -2638,7 +3253,10 @@ export default function OwnerPage() {
       const invoiceMeta = inferInvoiceMeta(invoice);
       const invoiceProject = projectsById.get(invoice.project_id) ?? null;
       const invoiceClient = invoiceProject ? clientsById.get(invoiceProject.client_id) ?? null : null;
-      const effectiveService = (invoiceMeta.serviceCategory ?? invoice.project_service ?? invoiceProject?.service ?? "website").toLowerCase();
+      const effectiveService = normalizeInvoiceServiceFilterValue(
+        invoiceMeta.serviceCategory ?? invoice.project_service ?? invoiceProject?.service,
+        "website"
+      );
       const searchHaystack = [
         invoice.invoice_number,
         invoice.project_name ?? "",
@@ -2685,11 +3303,11 @@ export default function OwnerPage() {
   );
 
   const invoiceServiceOptions = useMemo(() => {
-    const serviceSet = new Set<ServiceType>();
+    const serviceSet = new Set<Exclude<InvoiceServiceFilter, "all">>();
 
     projectInvoices.forEach((invoice) => {
       const invoiceMeta = inferInvoiceMeta(invoice);
-      const service = (invoiceMeta.serviceCategory ?? invoice.project_service ?? "website").toLowerCase() as ServiceType;
+      const service = normalizeInvoiceServiceFilterValue(invoiceMeta.serviceCategory ?? invoice.project_service, "website");
       serviceSet.add(service);
     });
 
@@ -2815,12 +3433,263 @@ export default function OwnerPage() {
   const smmPendingCount = smmSchedule.filter((item) => item.status !== "done").length;
   const smmAutoNextPost = getNextPostFromSmmSchedule(smmSchedule) || smmNextPostTime || "—";
 
+  const generalOverviewAnalytics = useMemo(() => {
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayMs = 24 * 60 * 60 * 1000;
+
+    const projectMap = new Map(projects.map((project) => [project.id, project]));
+
+    const resolveInvoiceDate = (invoice: InvoiceRow) => {
+      const raw = invoice.issue_date || invoice.due_date;
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed;
+    };
+
+    const earliestAvailableDate = (() => {
+      const invoiceDates = projectInvoices.map(resolveInvoiceDate).filter((date): date is Date => Boolean(date));
+      if (invoiceDates.length > 0) {
+        return new Date(Math.min(...invoiceDates.map((date) => date.getTime())));
+      }
+
+      const projectDates = projects
+        .flatMap((project) => [project.start_date, project.delivery_date])
+        .map((value) => (value ? new Date(value) : null))
+        .filter((date): date is Date => date !== null && !Number.isNaN(date.getTime()));
+
+      if (projectDates.length > 0) {
+        return new Date(Math.min(...projectDates.map((date) => date.getTime())));
+      }
+
+      return new Date(now.getFullYear(), 0, 1);
+    })();
+
+    const toDateStart = (value: string) => {
+      const parsed = new Date(`${value}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed;
+    };
+
+    const toDateEnd = (value: string) => {
+      const parsed = new Date(`${value}T23:59:59`);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed;
+    };
+
+    const customStart = overviewCustomRange.start ? toDateStart(overviewCustomRange.start) : null;
+    const customEnd = overviewCustomRange.end ? toDateEnd(overviewCustomRange.end) : null;
+    const hasValidCustomRange = Boolean(customStart && customEnd && customStart <= customEnd);
+
+    const startDate = (() => {
+      if (overviewRange === "7d") return new Date(todayMidnight.getTime() - 6 * 24 * 60 * 60 * 1000);
+      if (overviewRange === "30d") return new Date(todayMidnight.getTime() - 29 * 24 * 60 * 60 * 1000);
+      if (overviewRange === "ytd") return new Date(now.getFullYear(), 0, 1);
+      if (overviewRange === "custom" && hasValidCustomRange && customStart) return customStart;
+      if (overviewRange === "all") return earliestAvailableDate;
+      return new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    })();
+
+    const endDate = overviewRange === "custom" && hasValidCustomRange && customEnd ? customEnd : now;
+
+    const scopedInvoices = projectInvoices.filter((invoice) => {
+      const date = resolveInvoiceDate(invoice);
+      if (!date) return false;
+      return date >= startDate && date <= endDate;
+    });
+
+    const amountForInvoice = (invoice: InvoiceRow) => Number(invoice.amount) || 0;
+    const receivedForInvoice = (invoice: InvoiceRow) => {
+      if (typeof invoice.paid_amount === "number" && Number.isFinite(invoice.paid_amount)) return Math.max(0, invoice.paid_amount);
+      if (invoice.status === "paid") return amountForInvoice(invoice);
+      return 0;
+    };
+
+    const totalInvoiced = scopedInvoices.reduce((sum, invoice) => sum + amountForInvoice(invoice), 0);
+    const totalReceived = scopedInvoices.reduce((sum, invoice) => sum + Math.min(receivedForInvoice(invoice), amountForInvoice(invoice)), 0);
+    const outstandingAmount = Math.max(0, totalInvoiced - totalReceived);
+
+    const overdueInvoices = scopedInvoices.filter((invoice) => {
+      if (invoice.status === "paid") return false;
+      if (!invoice.due_date) return false;
+      const due = new Date(invoice.due_date);
+      if (Number.isNaN(due.getTime())) return false;
+      return due < todayMidnight;
+    });
+
+    const averageInvoice = scopedInvoices.length ? totalInvoiced / scopedInvoices.length : 0;
+    const collectionRate = totalInvoiced > 0 ? (totalReceived / totalInvoiced) * 100 : 0;
+    const unpaidCount = scopedInvoices.filter((invoice) => invoice.status !== "paid").length;
+    const overdueAmount = overdueInvoices.reduce((sum, invoice) => {
+      const amount = amountForInvoice(invoice);
+      const remaining = amount - Math.min(receivedForInvoice(invoice), amount);
+      return sum + Math.max(0, remaining);
+    }, 0);
+
+    const rangeDurationMs = Math.max(dayMs, endDate.getTime() - startDate.getTime() + 1);
+    const previousStartDate = new Date(startDate.getTime() - rangeDurationMs);
+    const previousEndDate = new Date(startDate.getTime() - 1);
+    const previousInvoices = projectInvoices.filter((invoice) => {
+      const date = resolveInvoiceDate(invoice);
+      if (!date) return false;
+      return date >= previousStartDate && date <= previousEndDate;
+    });
+    const previousInvoiced = previousInvoices.reduce((sum, invoice) => sum + amountForInvoice(invoice), 0);
+    const previousReceived = previousInvoices.reduce((sum, invoice) => sum + Math.min(receivedForInvoice(invoice), amountForInvoice(invoice)), 0);
+
+    const calcDeltaPct = (currentValue: number, previousValue: number) => {
+      if (previousValue <= 0) return currentValue > 0 ? 100 : 0;
+      return ((currentValue - previousValue) / previousValue) * 100;
+    };
+
+    const activeClients = new Set(
+      projects
+        .filter((project) => project.status !== "delivered")
+        .map((project) => project.client_id),
+    ).size;
+
+    const serviceRevenueMap = new Map<ServiceType, number>();
+    scopedInvoices.forEach((invoice) => {
+      const project = projectMap.get(invoice.project_id);
+      if (!project) return;
+      const current = serviceRevenueMap.get(project.service) ?? 0;
+      serviceRevenueMap.set(project.service, current + receivedForInvoice(invoice));
+    });
+
+    const topServiceEntry = Array.from(serviceRevenueMap.entries()).sort((a, b) => b[1] - a[1])[0];
+
+    const buildKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const buildMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    const chartRows: Array<{ key: string; label: string; year: number; invoiced: number; received: number }> = [];
+    const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    const totalDays = Math.max(1, Math.floor((endDay.getTime() - startDay.getTime()) / dayMs) + 1);
+    const dayBased = overviewRange === "7d" || overviewRange === "30d" || (overviewRange === "custom" && totalDays <= 62);
+
+    if (dayBased) {
+      const days = overviewRange === "7d" ? 7 : overviewRange === "30d" ? 30 : totalDays;
+      for (let i = 0; i < days; i += 1) {
+        const d = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
+        chartRows.push({
+          key: buildKey(d),
+          label: d.toLocaleDateString("en-US", {
+            weekday: days <= 10 ? "short" : undefined,
+            month: days > 10 ? "short" : undefined,
+            day: "numeric",
+          }),
+          year: d.getFullYear(),
+          invoiced: 0,
+          received: 0,
+        });
+      }
+    } else {
+      const monthStart = overviewRange === "ytd"
+        ? new Date(now.getFullYear(), 0, 1)
+        : overviewRange === "custom"
+          ? new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+          : overviewRange === "all"
+            ? new Date(earliestAvailableDate.getFullYear(), earliestAvailableDate.getMonth(), 1)
+          : new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const monthCount = overviewRange === "ytd"
+        ? now.getMonth() + 1
+        : overviewRange === "custom"
+          ? Math.max(1, (endDate.getFullYear() - monthStart.getFullYear()) * 12 + (endDate.getMonth() - monthStart.getMonth()) + 1)
+          : overviewRange === "all"
+            ? Math.max(1, (now.getFullYear() - monthStart.getFullYear()) * 12 + (now.getMonth() - monthStart.getMonth()) + 1)
+          : 12;
+      for (let i = 0; i < monthCount; i += 1) {
+        const d = new Date(monthStart.getFullYear(), monthStart.getMonth() + i, 1);
+        chartRows.push({
+          key: buildMonthKey(d),
+          label:
+            overviewRange === "all"
+              ? d.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+              : d.toLocaleDateString("en-US", { month: "short" }),
+          year: d.getFullYear(),
+          invoiced: 0,
+          received: 0,
+        });
+      }
+    }
+
+    const rowMap = new Map(chartRows.map((row) => [row.key, row]));
+    scopedInvoices.forEach((invoice) => {
+      const date = resolveInvoiceDate(invoice);
+      if (!date) return;
+      const key = dayBased ? buildKey(date) : buildMonthKey(date);
+      const row = rowMap.get(key);
+      if (!row) return;
+      row.invoiced += amountForInvoice(invoice);
+      row.received += Math.min(receivedForInvoice(invoice), amountForInvoice(invoice));
+    });
+
+    const chartPeak = Math.max(1, ...chartRows.map((row) => Math.max(row.invoiced, row.received)));
+    const chartYears = Array.from(new Set(chartRows.map((row) => row.year))).sort((a, b) => a - b);
+    const chartYearLabel =
+      chartYears.length === 0
+        ? ""
+        : chartYears.length === 1
+          ? String(chartYears[0])
+          : `${chartYears[0]}–${chartYears[chartYears.length - 1]}`;
+
+    return {
+      totalInvoiced,
+      totalReceived,
+      outstandingAmount,
+      overdueCount: overdueInvoices.length,
+      averageInvoice,
+      collectionRate,
+      unpaidCount,
+      overdueAmount,
+      activeClients,
+      topService: topServiceEntry?.[0] ?? "—",
+      topServiceRevenue: topServiceEntry?.[1] ?? 0,
+      invoicedDeltaPct: calcDeltaPct(totalInvoiced, previousInvoiced),
+      receivedDeltaPct: calcDeltaPct(totalReceived, previousReceived),
+      invoiceCountDeltaPct: calcDeltaPct(scopedInvoices.length, previousInvoices.length),
+      chartRows,
+      chartPeak,
+      chartYears,
+      chartYearLabel,
+      scopedInvoiceCount: scopedInvoices.length,
+      hasValidCustomRange,
+      rangeLabel:
+        overviewRange === "7d"
+          ? "Last 7 days"
+          : overviewRange === "30d"
+            ? "Last 30 days"
+            : overviewRange === "ytd"
+              ? "Year to date"
+              : overviewRange === "custom" && hasValidCustomRange && customStart && customEnd
+                ? `${customStart.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} → ${customEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                : overviewRange === "custom"
+                  ? "Custom range"
+                  : overviewRange === "all"
+                    ? "All time"
+                  : "Last 12 months",
+    };
+  }, [projectInvoices, projects, overviewRange, overviewCustomRange]);
+
   const tabButtonClass = (tab: OwnerTab) =>
     `rounded-full border px-4 py-2 text-sm font-semibold transition ${
       activeTab === tab
         ? "border-white bg-white text-black"
         : "border-white/15 bg-black/30 text-white/70 hover:border-white/25 hover:text-white"
     }`;
+
+  function updateOverviewBarTooltip(
+    _event: ReactMouseEvent<HTMLDivElement> | ReactFocusEvent<HTMLDivElement>,
+    payload: {
+      label: string;
+      value: number;
+      metricLabel: string;
+      trendLabel: string;
+    }
+  ) {
+    setHoveredOverviewBar(payload);
+  }
 
   return authorized ? (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.08),transparent_52%),#040404] text-white">
@@ -2908,7 +3777,7 @@ export default function OwnerPage() {
 
         </aside>
 
-        <main className="min-w-0 px-3 py-4 sm:px-5 sm:py-5 lg:ml-[288px] lg:px-7 lg:py-6 xl:ml-[320px] xl:px-10">
+        <main className="min-w-0 px-2 py-2 sm:px-5 sm:py-5 lg:ml-[288px] lg:px-7 lg:py-6 xl:ml-[320px] xl:px-10">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-4 rounded-2xl border border-white/10 bg-black/35 p-3 backdrop-blur lg:hidden">
           <div className="flex items-center justify-between gap-2">
@@ -2981,8 +3850,8 @@ export default function OwnerPage() {
 
         <div className="mb-8">
           <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{t.title}</p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">{t.clientContext}</h1>
-          <p className="mt-3 max-w-3xl text-white/60">{t.subtitle}</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">{t.clientContext}</h1>
+          <p className="mt-2 max-w-3xl text-sm text-white/60 sm:mt-3 sm:text-base">{t.subtitle}</p>
         </div>
 
         <AnimatePresence initial={false} mode="wait">
@@ -3018,46 +3887,283 @@ export default function OwnerPage() {
         <div
           className={
             showMobileInvoiceDetails
-              ? "mt-5 border-0 bg-transparent p-0 shadow-none lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-black/50 lg:p-6 lg:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
-              : "mt-5 rounded-[28px] border border-white/8 bg-black/50 p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+              ? "mt-4 border-0 bg-transparent p-0 shadow-none lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-black/50 lg:p-6 lg:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+              : "mt-4 rounded-[28px] border border-white/8 bg-black/50 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)] sm:p-6"
           }
         >
           <AnimatePresence mode="wait" initial={false}>
             {activeTab === "overview" && (
               <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
-                <p className="text-sm text-white/65">{t.allGood}</p>
+                <p className="text-xs text-white/65 sm:text-sm">{t.allGood}</p>
 
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
                     <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">{t.appWebsiteStatus}</p>
-                    <p className="mt-2 text-lg font-semibold text-white">{selectedProject?.name ?? (isGeneralMode ? "General company view" : "—")}</p>
-                    <p className="mt-1 text-sm text-white/60">{selectedProject ? `${selectedProject.service.toUpperCase()} · ${projectStatusLabels[language][selectedProject.status]} · ${selectedProject.progress}%` : isGeneralMode ? `Clients · ${clients.length} · Projects · ${projects.length}` : "—"}</p>
+                    <p className="mt-2 text-base font-semibold text-white sm:text-lg">{selectedProject?.name ?? (isGeneralMode ? "General company view" : "—")}</p>
+                    <p className="mt-1 text-xs text-white/60 sm:text-sm">{selectedProject ? `${selectedProject.service.toUpperCase()} · ${projectStatusLabels[language][selectedProject.status]} · ${selectedProject.progress}%` : isGeneralMode ? `Clients · ${clients.length} · Projects · ${projects.length}` : "—"}</p>
                   </div>
 
-                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+                  <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
                     <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">{t.dashboardInfo}</p>
                     <p className="mt-2 text-sm text-white/75">{overviewProjectText}</p>
                   </div>
                 </div>
 
                 {isGeneralMode && (
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">All clients</p>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{clients.length}</p>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:gap-3 sm:p-4">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">Business intelligence</p>
+                        <p className="mt-1 text-xs text-white/70 sm:text-sm">{generalOverviewAnalytics.rangeLabel} · {generalOverviewAnalytics.scopedInvoiceCount} invoices tracked</p>
+                        {generalOverviewAnalytics.chartYearLabel && (
+                          <p className="mt-1 text-[11px] text-white/45">Chart years: {generalOverviewAnalytics.chartYearLabel}</p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        {generalOverviewAnalytics.chartYearLabel && (
+                          <span className="rounded-full border border-white/12 bg-black/55 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70 sm:px-3 sm:text-[10px]">
+                            Years {generalOverviewAnalytics.chartYearLabel}
+                          </span>
+                        )}
+                        {[
+                          { key: "7d", label: "7D" },
+                          { key: "30d", label: "30D" },
+                          { key: "ytd", label: "YTD" },
+                          { key: "12m", label: "12M" },
+                          { key: "all", label: "All time" },
+                          { key: "custom", label: "Custom" },
+                        ].map((item) => (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setOverviewRange(item.key as "7d" | "30d" | "ytd" | "12m" | "custom" | "all")}
+                            className={`rounded-full border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition sm:px-3 sm:text-[11px] ${
+                              overviewRange === item.key
+                                ? "border-white/30 bg-white/15 text-white"
+                                : "border-white/15 bg-black/50 text-white/65 hover:border-white/25 hover:text-white"
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">All projects</p>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{projects.length}</p>
+
+                    {overviewRange === "custom" && (
+                      <div className="grid gap-3 rounded-[20px] border border-white/10 bg-black/35 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                        <label className="space-y-1 text-[11px] uppercase tracking-[0.12em] text-white/45">
+                          Start date
+                          <input
+                            type="date"
+                            value={overviewCustomRange.start}
+                            onChange={(event) => setOverviewCustomRange((prev) => ({ ...prev, start: event.target.value }))}
+                            className="h-10 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/25 focus:border-white/35 [color-scheme:dark]"
+                          />
+                        </label>
+                        <label className="space-y-1 text-[11px] uppercase tracking-[0.12em] text-white/45">
+                          End date
+                          <input
+                            type="date"
+                            value={overviewCustomRange.end}
+                            onChange={(event) => setOverviewCustomRange((prev) => ({ ...prev, end: event.target.value }))}
+                            className="h-10 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/25 focus:border-white/35 [color-scheme:dark]"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const end = new Date();
+                            const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 29);
+                            setOverviewCustomRange({
+                              start: toInputDate(start.toISOString()),
+                              end: toInputDate(end.toISOString()),
+                            });
+                          }}
+                          className="h-10 self-end rounded-lg border border-white/15 bg-black/50 px-3 text-xs font-semibold text-white/75 transition hover:border-white/25 hover:text-white"
+                        >
+                          Reset to 30D
+                        </button>
+                        {!generalOverviewAnalytics.hasValidCustomRange && (
+                          <p className="md:col-span-3 text-xs text-amber-200/85">Choose a valid range where start date is earlier than end date.</p>
+                        )}
+                      </div>
+                    )}
+
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={overviewRange === "custom" ? `${overviewRange}-${overviewCustomRange.start}-${overviewCustomRange.end}` : overviewRange}
+                        initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+                        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                        exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
+                        transition={{ duration: 0.28, ease: "easeOut" }}
+                        className="space-y-4"
+                      >
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                        <p className="text-[9px] uppercase tracking-[0.12em] text-white/45 sm:text-[10px]">Revenue received</p>
+                        <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-300 sm:text-3xl">{formatAzn(generalOverviewAnalytics.totalReceived)}</p>
+                        <p className="mt-1 text-[11px] text-white/55 sm:text-xs">Collection {generalOverviewAnalytics.collectionRate.toFixed(1)}%</p>
+                        <p className={`mt-1 text-[10px] font-medium sm:text-[11px] ${generalOverviewAnalytics.receivedDeltaPct >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
+                          {generalOverviewAnalytics.receivedDeltaPct >= 0 ? "+" : ""}{generalOverviewAnalytics.receivedDeltaPct.toFixed(1)}% vs previous period
+                        </p>
+                      </div>
+                      <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                        <p className="text-[9px] uppercase tracking-[0.12em] text-white/45 sm:text-[10px]">Invoiced volume</p>
+                        <p className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{formatAzn(generalOverviewAnalytics.totalInvoiced)}</p>
+                        <p className="mt-1 text-[11px] text-white/55 sm:text-xs">Avg invoice {formatAzn(generalOverviewAnalytics.averageInvoice)}</p>
+                        <p className={`mt-1 text-[10px] font-medium sm:text-[11px] ${generalOverviewAnalytics.invoicedDeltaPct >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
+                          {generalOverviewAnalytics.invoicedDeltaPct >= 0 ? "+" : ""}{generalOverviewAnalytics.invoicedDeltaPct.toFixed(1)}% vs previous period
+                        </p>
+                      </div>
+                      <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                        <p className="text-[9px] uppercase tracking-[0.12em] text-white/45 sm:text-[10px]">Outstanding</p>
+                        <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-200 sm:text-3xl">{formatAzn(generalOverviewAnalytics.outstandingAmount)}</p>
+                        <p className="mt-1 text-[11px] text-white/55 sm:text-xs">Overdue invoices {generalOverviewAnalytics.overdueCount}</p>
+                        <p className="mt-1 text-[10px] text-white/65 sm:text-[11px]">Overdue value {formatAzn(generalOverviewAnalytics.overdueAmount)}</p>
+                      </div>
+                      <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                        <p className="text-[9px] uppercase tracking-[0.12em] text-white/45 sm:text-[10px]">Top service</p>
+                        <p className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">{String(generalOverviewAnalytics.topService).toUpperCase()}</p>
+                        <p className="mt-1 text-[11px] text-white/55 sm:text-xs">{formatAzn(generalOverviewAnalytics.topServiceRevenue)} received</p>
+                        <p className="mt-1 text-[10px] text-white/65 sm:text-[11px]">Unpaid invoices {generalOverviewAnalytics.unpaidCount}</p>
+                      </div>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">All invoices</p>
-                      <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{allInvoiceCount}</p>
+
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start">
+                      <div className="self-start rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4">
+                          <p className="text-[9px] uppercase tracking-[0.12em] text-white/45 sm:text-[10px]">Revenue trend</p>
+                          <div className="inline-flex rounded-full border border-white/15 bg-black/35 p-1">
+                            {[
+                              { key: "received", label: "Received" },
+                              { key: "invoiced", label: "Invoiced" },
+                            ].map((metric) => (
+                              <button
+                                key={metric.key}
+                                type="button"
+                                onClick={() => setOverviewMetric(metric.key as "received" | "invoiced")}
+                                className={`rounded-full px-2.5 py-1.5 text-[10px] font-semibold transition sm:px-3 sm:text-[11px] ${
+                                  overviewMetric === metric.key
+                                    ? "bg-white text-black"
+                                    : "text-white/65 hover:text-white"
+                                }`}
+                              >
+                                {metric.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.div
+                            key={hoveredOverviewBar ? `${hoveredOverviewBar.metricLabel}-${hoveredOverviewBar.label}-${hoveredOverviewBar.value}` : "overview-hint"}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.16, ease: "easeOut" }}
+                            className="mb-3 rounded-xl border border-white/10 bg-black/35 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+                          >
+                            {hoveredOverviewBar ? (
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-[9px] uppercase tracking-[0.18em] text-white/40">{hoveredOverviewBar.metricLabel}</p>
+                                  <p className="mt-0.5 truncate text-sm font-semibold text-white">{hoveredOverviewBar.label}</p>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                  <p className="text-sm font-semibold tracking-tight text-white sm:text-base">{formatAzn(hoveredOverviewBar.value)}</p>
+                                  <p className="text-[9px] text-white/45 sm:text-[10px]">{hoveredOverviewBar.trendLabel}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-white/45 sm:text-xs">Hover a bar to see the amount and range details here.</p>
+                            )}
+                          </motion.div>
+                        </AnimatePresence>
+
+                        <div className="relative h-[188px] w-full max-w-full overflow-x-hidden overflow-y-hidden rounded-2xl border border-white/8 bg-black/20 px-2 pt-3 sm:h-[232px] sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                          <div className="pointer-events-none absolute inset-x-2 top-3 h-[146px] sm:h-[178px]">
+                            {[0, 1, 2, 3].map((line) => (
+                              <div
+                                key={line}
+                                className="absolute left-0 right-0 border-t border-white/6"
+                                style={{ top: `${(line / 3) * 100}%` }}
+                              />
+                            ))}
+                          </div>
+
+                          <div className="relative flex h-full w-full min-w-0 items-end gap-1 pr-0 sm:min-w-max sm:gap-2 sm:pr-2">
+                            {generalOverviewAnalytics.chartRows.map((row, idx) => {
+                              const value = overviewMetric === "received" ? row.received : row.invoiced;
+                              const heightPct = Math.max(4, Math.round((value / generalOverviewAnalytics.chartPeak) * 100));
+                              const metricLabel = overviewMetric === "received" ? "Received" : "Invoiced";
+                              const showYear = generalOverviewAnalytics.chartYears.length > 1 && row.year !== generalOverviewAnalytics.chartRows[idx - 1]?.year;
+
+                              return (
+                                <div
+                                  key={`${row.key}-${idx}`}
+                                  className="relative flex h-full w-0 min-w-0 flex-1 flex-col items-center justify-end gap-2 sm:w-12 sm:min-w-[48px] sm:flex-none"
+                                  onMouseEnter={(event) => updateOverviewBarTooltip(event, { label: row.label, value, metricLabel, trendLabel: generalOverviewAnalytics.rangeLabel })}
+                                  onMouseMove={(event) => updateOverviewBarTooltip(event, { label: row.label, value, metricLabel, trendLabel: generalOverviewAnalytics.rangeLabel })}
+                                  onMouseLeave={() => setHoveredOverviewBar(null)}
+                                  onFocus={(event) => updateOverviewBarTooltip(event, { label: row.label, value, metricLabel, trendLabel: generalOverviewAnalytics.rangeLabel })}
+                                  onBlur={() => setHoveredOverviewBar(null)}
+                                  tabIndex={0}
+                                >
+                                  <div className="flex h-[146px] w-full items-end rounded-md border border-white/5 bg-black/10 px-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] transition-colors duration-200 hover:border-white/12 hover:bg-black/20 sm:h-[178px]">
+                                    <motion.div
+                                      initial={{ height: 0, opacity: 0 }}
+                                      animate={{ height: `${heightPct}%`, opacity: 1 }}
+                                      transition={{ duration: 0.4, delay: idx * 0.012, ease: [0.16, 1, 0.3, 1] }}
+                                      className={`w-full rounded-sm shadow-[0_0_18px_rgba(255,255,255,0.05)] ${overviewMetric === "received" ? "bg-gradient-to-t from-emerald-400/85 to-emerald-200/50" : "bg-gradient-to-t from-white/80 to-white/40"}`}
+                                    />
+                                  </div>
+                                  <p className="w-full truncate text-center text-[9px] text-white/45 sm:text-[10px]">
+                                    {row.label}
+                                    {showYear ? <span className="ml-1 text-white/30">{String(row.year).slice(-2)}</span> : null}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="hidden self-start rounded-[24px] border border-white/10 bg-white/[0.04] p-4 md:block">
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">Executive snapshot</p>
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                            <p className="text-white/50">Active clients</p>
+                            <p className="mt-1 text-xl font-semibold text-white">{generalOverviewAnalytics.activeClients}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                            <p className="text-white/50">Total clients</p>
+                            <p className="mt-1 text-xl font-semibold text-white">{clients.length}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                            <p className="text-white/50">Total projects</p>
+                            <p className="mt-1 text-xl font-semibold text-white">{projects.length}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                            <p className="text-white/50">All invoices</p>
+                            <p className="mt-1 text-xl font-semibold text-white">{allInvoiceCount}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                            <p className="text-white/50">Invoice activity</p>
+                            <p className="mt-1 text-xl font-semibold text-white">{generalOverviewAnalytics.scopedInvoiceCount}</p>
+                            <p className={`mt-1 text-[11px] ${generalOverviewAnalytics.invoiceCountDeltaPct >= 0 ? "text-emerald-200" : "text-rose-200"}`}>
+                              {generalOverviewAnalytics.invoiceCountDeltaPct >= 0 ? "+" : ""}{generalOverviewAnalytics.invoiceCountDeltaPct.toFixed(1)}% vs previous period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
                 )}
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="hidden gap-4 md:grid md:grid-cols-2">
                   <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
                     <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">{t.latestInvoices}</p>
                     <div className="mt-3 space-y-2">
@@ -3543,6 +4649,15 @@ export default function OwnerPage() {
                                 className="w-full rounded-xl px-3 py-2.5 text-left text-sm text-white/85 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                               >
                                 Record payment
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleMarkInvoiceAsMisc(selectedInvoiceRow.id);
+                                }}
+                                className="mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm text-cyan-200 hover:bg-cyan-500/15"
+                              >
+                                Mark as MISC
                               </button>
                               <button
                                 type="button"
@@ -4650,280 +5765,703 @@ export default function OwnerPage() {
             )}
 
             {activeTab === "profiles" && (
-              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex gap-0 -mx-6 h-[calc(100vh-180px)]">
-                {/* Left Column - Context */}
-                <div className="flex-none w-64 border-r border-white/10 bg-black/40 px-6 py-6 overflow-y-auto">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-xs uppercase tracking-[0.14em] text-white/45 font-semibold">Admin Control Center</h3>
-                      <p className="mt-2 text-xl font-bold text-white">Client context</p>
-                      <p className="mt-2 text-xs text-white/50">Select a client once, then manage everything for that client across tabs.</p>
-                    </div>
+              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex min-h-0 flex-col gap-2 md:h-[calc(100vh-280px)] md:gap-3 md:overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
+                  <div>
+                    <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">Client Profiles</h2>
+                    <p className="mt-0.5 text-[11px] text-white/50 sm:text-xs">Premium client workspace with independent panel scrolling.</p>
                   </div>
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setProfileClientId("");
+                      setClientProfileDraft(createEmptyClientProfileDraft());
+                      setIsInlineCreateClientMode(true);
+                      setIsInlineEditClientMode(false);
+                    }}
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="h-8 rounded-lg border border-white/20 bg-black px-3 text-[11px] font-semibold text-white transition hover:bg-[#101010] sm:ml-auto sm:h-9 sm:text-xs"
+                  >
+                    + New Client
+                  </motion.button>
                 </div>
 
-                {/* Middle Column - Client List */}
-                <div className="flex-1 border-r border-white/10 bg-[#0a0a0a] overflow-y-auto">
-                  <div className="sticky top-0 z-10 border-b border-white/10 bg-[#0a0a0a]/95 backdrop-blur-sm px-6 py-4">
-                    <h2 className="text-lg font-semibold tracking-tight text-white">Client Profiles</h2>
-                    <p className="mt-1 text-xs text-white/50">Manage all your client information and projects</p>
-                    <div className="mt-4 flex items-center gap-2">
-                      <motion.button
-                        type="button"
-                        onClick={() => {
-                          setProfileClientId("");
-                          setClientProfileDraft(createEmptyClientProfileDraft());
-                          setIsClientProfileOpen(true);
-                        }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="h-10 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/15 transition flex items-center justify-center gap-2"
-                      >
-                        <span>+</span>
-                        New
-                      </motion.button>
+                {clients.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-1 items-center justify-center rounded-2xl border border-white/10 bg-[#050505]"
+                  >
+                    <div className="text-center">
+                      <Users className="mx-auto mb-3 text-white/25" size={32} weight="light" />
+                      <p className="text-sm text-white/45">No clients yet.</p>
                     </div>
-                  </div>
-
-                  <div className="space-y-1 p-4">
-                    {clients.length === 0 ? (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="py-12 px-4 text-center"
-                      >
-                        <Users className="mx-auto mb-3 text-white/20" size={32} weight="light" />
-                        <p className="text-xs text-white/40">No clients yet.</p>
-                      </motion.div>
-                    ) : (
-                      <AnimatePresence>
-                        {clients.map((client, idx) => {
-                          const isSelected = selectedClientForDetails === client.id;
-                          const clientProjects = projects.filter((p) => p.client_id === client.id);
-                          const isPortalActive = inferPortalEnabled(client);
-
-                          return (
-                            <motion.button
-                              key={client.id}
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={{ delay: idx * 0.05 }}
+                  </motion.div>
+                ) : (
+                  <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-[330px_minmax(0,1fr)] lg:gap-3">
+                    <aside className="min-h-0 max-h-[32vh] rounded-2xl border border-white/10 bg-[#050505] p-2.5 sm:max-h-[44vh] sm:p-3 lg:max-h-none">
+                      <div className="mb-2.5 flex items-center justify-between px-1 sm:mb-3 sm:px-1.5">
+                        <p className="text-[10px] uppercase tracking-[0.14em] text-white/45 sm:text-[11px]">Clients</p>
+                        <p className="text-[10px] text-white/45 sm:text-[11px]">{clients.length}</p>
+                      </div>
+                      <div className="mb-2.5 space-y-2 px-1 sm:mb-3">
+                        <input
+                          value={profileSearchQuery}
+                          onChange={(e) => setProfileSearchQuery(e.target.value)}
+                          placeholder="Search clients..."
+                          className="h-8 w-full rounded-lg border border-white/15 bg-[#0b0b0b] px-3 text-[11px] text-white outline-none transition hover:border-white/25 focus:border-white/35 sm:h-9 sm:text-xs"
+                        />
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            { key: "all", label: "All" },
+                            { key: "portal", label: "Portal" },
+                            { key: "non-portal", label: "No Portal" },
+                            { key: "with-invoices", label: "Invoices" },
+                          ].map((chip) => (
+                            <button
+                              key={chip.key}
                               type="button"
-                              onClick={() => {
-                                setSelectedClientForDetails(client.id);
-                                setShowClientDetailsPanel(true);
-                              }}
-                              className={`w-full rounded-lg border transition-all duration-200 p-3 text-left group ${
-                                isSelected
-                                  ? "border-white/30 bg-white/10 shadow-lg shadow-white/10"
-                                  : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                              onClick={() => setProfileFilterMode(chip.key as "all" | "portal" | "non-portal" | "with-invoices")}
+                              className={`rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] transition sm:px-2.5 sm:text-[10px] ${
+                                profileFilterMode === chip.key
+                                  ? "border-white/35 bg-white/15 text-white"
+                                  : "border-white/15 bg-[#0f0f0f] text-white/65 hover:border-white/25 hover:text-white"
                               }`}
                             >
-                              <div className="space-y-2">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1">
-                                    <h3 className="text-sm font-semibold text-white">{client.brand_name}</h3>
-                                  </div>
-                                  {isPortalActive && (
-                                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded bg-emerald-400/20 text-emerald-300">
-                                      Portal
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-[10px] text-white/50">
-                                  <span className="truncate">{client.username || "—"}</span>
-                                  <span>•</span>
-                                  <span className="truncate">{client.whatsapp_number || "—"}</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-[10px] text-white/40">
-                                  <Package size={12} />
-                                  <span>{clientProjects.length} project{clientProjects.length !== 1 ? "s" : ""}</span>
-                                </div>
-                              </div>
-                            </motion.button>
-                          );
-                        })}
-                      </AnimatePresence>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Column - Details Panel */}
-                <AnimatePresence>
-                  {showClientDetailsPanel && selectedClientForDetails && (
-                    <motion.div
-                      key="client-details"
-                      initial={{ opacity: 0, x: 300 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 300 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex-none w-96 border-l border-white/10 bg-black/40 overflow-y-auto"
-                    >
-                      {/* Header */}
-                      <div className="sticky top-0 z-10 border-b border-white/10 bg-black/40 backdrop-blur-sm px-6 py-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client Profile</p>
-                            <h2 className="mt-1 text-lg font-semibold tracking-tight text-white">
-                              {(() => {
-                                const client = clients.find((c) => c.id === selectedClientForDetails);
-                                return client?.brand_name || "Loading...";
-                              })()}
-                            </h2>
-                          </div>
-                          <motion.button
-                            type="button"
-                            onClick={() => {
-                              setShowClientDetailsPanel(false);
-                              setSelectedClientForDetails(null);
-                            }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="text-white/50 hover:text-white transition"
-                          >
-                            <X size={20} weight="bold" />
-                          </motion.button>
+                              {chip.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-
-                      {/* Content */}
-                      <div className="space-y-5 p-6">
+                      <div className="max-h-[calc(32vh-52px)] space-y-2 overflow-y-auto pr-1 sm:max-h-[calc(44vh-52px)] lg:h-[calc(100%-28px)] lg:max-h-none">
                         {(() => {
-                          const client = clients.find((c) => c.id === selectedClientForDetails);
-                          const clientInvoices = projectInvoices.filter((inv: InvoiceRow) => {
-                            const project = projects.find((p) => p.id === inv.project_id);
-                            return project?.client_id === selectedClientForDetails;
-                          });
-                          const isPortalActive = client ? inferPortalEnabled(client) : false;
+                          const normalizedSearch = profileSearchQuery.trim().toLowerCase();
+                          const filteredClients = clients.filter((client) => {
+                            const isPortalActive = inferPortalEnabled(client);
+                            const clientProjects = projects.filter((p) => p.client_id === client.id);
+                            const hasInvoices = projectInvoices.some((inv: InvoiceRow) => clientProjects.some((project) => project.id === inv.project_id));
 
-                          if (!client) return <p className="text-white/50 text-xs">Loading...</p>;
+                            const matchesSearch =
+                              !normalizedSearch ||
+                              client.brand_name.toLowerCase().includes(normalizedSearch) ||
+                              (client.username ?? "").toLowerCase().includes(normalizedSearch) ||
+                              (client.whatsapp_number ?? "").toLowerCase().includes(normalizedSearch);
+
+                            const matchesFilter =
+                              profileFilterMode === "all" ||
+                              (profileFilterMode === "portal" && isPortalActive) ||
+                              (profileFilterMode === "non-portal" && !isPortalActive) ||
+                              (profileFilterMode === "with-invoices" && hasInvoices);
+
+                            return matchesSearch && matchesFilter;
+                          });
+
+                          const activeClientId =
+                            filteredClients.find((c) => c.id === selectedClientForDetails)?.id ??
+                            filteredClients[0]?.id ??
+                            null;
 
                           return (
-                            <>
-                              {/* Client Info */}
-                              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 space-y-3">
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-wider text-white/45">Company</p>
-                                  <p className="mt-1 text-sm font-semibold text-white">{client.brand_name}</p>
-                                </div>
-                                <div className="space-y-2 text-xs">
-                                  <div>
-                                    <p className="uppercase tracking-wider text-white/45">Representative</p>
-                                    <p className="text-white/80">{client.username || "—"}</p>
-                                  </div>
-                                  <div>
-                                    <p className="uppercase tracking-wider text-white/45">WhatsApp</p>
-                                    <p className="text-white/80">{client.whatsapp_number || "—"}</p>
-                                  </div>
-                                </div>
-                                {isPortalActive && (
-                                  <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/15 p-2">
-                                    <p className="text-[10px] text-emerald-100">✓ Portal access active</p>
-                                  </div>
-                                )}
-                              </div>
+                            <AnimatePresence>
+                              {filteredClients.map((client, idx) => {
+                                const clientProjects = projects.filter((p) => p.client_id === client.id);
+                                const isSelected = activeClientId === client.id;
+                                const isPortalActive = inferPortalEnabled(client);
 
-                              {/* Projects Summary */}
-                              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                                <p className="text-[10px] uppercase tracking-wider text-white/45 font-semibold">Projects</p>
-                                <div className="mt-3 grid gap-2 grid-cols-3">
-                                  <div className="rounded-lg bg-white/5 p-2 text-center">
-                                    <p className="text-lg font-bold text-white">{projects.filter((p) => p.client_id === client.id).length}</p>
-                                    <p className="mt-1 text-[9px] uppercase text-white/50">Total</p>
-                                  </div>
-                                  <div className="rounded-lg bg-white/5 p-2 text-center">
-                                    <p className="text-lg font-bold text-blue-400">{projects.filter((p) => p.client_id === client.id && p.status !== "delivered").length}</p>
-                                    <p className="mt-1 text-[9px] uppercase text-white/50">Active</p>
-                                  </div>
-                                  <div className="rounded-lg bg-white/5 p-2 text-center">
-                                    <p className="text-lg font-bold text-emerald-400">{projects.filter((p) => p.client_id === client.id && p.status === "delivered").length}</p>
-                                    <p className="mt-1 text-[9px] uppercase text-white/50">Done</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Invoices */}
-                              <div className="space-y-2">
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-white">Invoices ({clientInvoices.length})</h3>
-                                {clientInvoices.length > 0 ? (
-                                  <div className="space-y-1 max-h-[250px] overflow-y-auto">
-                                    <AnimatePresence>
-                                      {clientInvoices.slice(0, 5).map((invoice: InvoiceRow, idx: number) => (
-                                        <motion.button
-                                          key={invoice.id}
-                                          initial={{ opacity: 0, x: -10 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          exit={{ opacity: 0, x: -10 }}
-                                          transition={{ delay: idx * 0.03 }}
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveTab("invoices");
-                                            setSelectedInvoiceId(invoice.id);
-                                            const project = projects.find((p) => p.id === invoice.project_id);
-                                            if (project) {
-                                              setSelectedClientId(project.client_id);
-                                              setSelectedProjectId(project.id);
-                                              persistOwnerSelection(project.client_id, project.id);
-                                            }
-                                          }}
-                                          className="group w-full rounded-lg border border-white/10 bg-white/[0.03] p-2 text-left text-xs transition hover:border-white/20 hover:bg-white/[0.05]"
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <span className="font-medium text-white truncate">#{invoice.invoice_number}</span>
-                                            <span className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-semibold uppercase ${
-                                              invoice.status === "paid" ? "bg-emerald-400/20 text-emerald-200" :
-                                              invoice.status === "partial" ? "bg-yellow-400/20 text-yellow-200" :
-                                              "bg-red-400/20 text-red-200"
-                                            }`}>
-                                              {invoice.status}
-                                            </span>
-                                          </div>
-                                          <p className="mt-1 text-[9px] text-white/50">${invoice.amount.toLocaleString()}</p>
-                                        </motion.button>
-                                      ))}
-                                    </AnimatePresence>
-                                    {clientInvoices.length > 5 && (
-                                      <p className="text-[9px] text-white/40 p-2 text-center">+{clientInvoices.length - 5} more invoices</p>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="rounded-lg border border-dashed border-white/10 py-3 px-2 text-center">
-                                    <p className="text-[9px] text-white/40">No invoices</p>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Activity */}
-                              <div className="space-y-2 border-t border-white/10 pt-4">
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-white">Activity</h3>
-                                <div className="space-y-1 text-[9px]">
-                                  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
-                                    <p className="uppercase text-white/40">Client Created</p>
-                                    <p className="text-white/60 mt-0.5">Profile established</p>
-                                  </div>
-                                  {clientInvoices.length > 0 && (
-                                    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2">
-                                      <p className="uppercase text-white/40">{clientInvoices.length} Invoice{clientInvoices.length !== 1 ? "s" : ""}</p>
-                                      <p className="text-white/60 mt-0.5">Total: ${clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + inv.amount, 0).toLocaleString()}</p>
+                                return (
+                                  <motion.button
+                                    key={client.id}
+                                    type="button"
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -8 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    onClick={() => {
+                                      setSelectedClientForDetails(client.id);
+                                      setShowClientDetailsPanel(false);
+                                      setIsInlineCreateClientMode(false);
+                                      setIsInlineEditClientMode(false);
+                                    }}
+                                    className={`w-full rounded-xl border px-3 py-3 text-left transition-all duration-200 ${
+                                      isSelected
+                                        ? "border-white/30 bg-gradient-to-r from-white/15 to-white/[0.04] shadow-[0_14px_30px_rgba(0,0,0,0.45)]"
+                                        : "border-white/10 bg-gradient-to-r from-[#080808] to-[#0d0d0d] hover:border-white/25 hover:from-[#0d0d0d] hover:to-[#141414]"
+                                    }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex min-w-0 items-start gap-2.5">
+                                        <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                                          isSelected
+                                            ? "bg-white text-black"
+                                            : "bg-[#171717] text-white/80"
+                                        }`}>
+                                          {client.brand_name.slice(0, 1).toUpperCase()}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-semibold text-white">{client.brand_name}</p>
+                                          <p className="mt-0.5 truncate text-[11px] text-white/55">{client.username || "No representative"}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        {isPortalActive && <span className="rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white/90">Portal</span>}
+                                        <span className="rounded-full border border-white/20 bg-white/5 px-2 py-0.5 text-[9px] font-semibold text-white/80">{clientProjects.length}</span>
+                                      </div>
                                     </div>
-                                  )}
-                                  {clientInvoices.filter((inv: InvoiceRow) => (inv.paid_amount ?? 0) > 0).length > 0 && (
-                                    <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-2">
-                                      <p className="uppercase text-emerald-300">Payments</p>
-                                      <p className="text-emerald-100 mt-0.5">${clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + (inv.paid_amount ?? 0), 0).toLocaleString()}</p>
+                                    <div className="mt-2 flex items-center gap-1.5 text-[10px]">
+                                      <span className="truncate rounded-full border border-white/10 bg-[#0f0f0f] px-2 py-1 text-white/60">{client.whatsapp_number || "No phone"}</span>
+                                      <span className="rounded-full border border-white/15 bg-[#151515] px-2 py-1 text-white/75">{clientProjects.length} project{clientProjects.length !== 1 ? "s" : ""}</span>
                                     </div>
-                                  )}
-                                </div>
-                              </div>
-                            </>
+                                  </motion.button>
+                                );
+                              })}
+                            </AnimatePresence>
                           );
                         })()}
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </aside>
 
+                    <section className="min-h-0 overflow-y-auto rounded-2xl border border-white/10 bg-[#050505] p-3 sm:p-4 xl:p-5">
+                      <AnimatePresence mode="wait" initial={false}>
+                      {isInlineCreateClientMode ? (
+                        <motion.div
+                          key="profile-create"
+                          initial={{ opacity: 0, x: 14 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -14 }}
+                          transition={{ duration: 0.2 }}
+                          className="flex min-h-full flex-col gap-4"
+                        >
+                          <div className="rounded-xl border border-white/10 bg-[#0d0d0d] p-4">
+                            <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">New Client</p>
+                            <h3 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">Create Client Profile</h3>
+                            <p className="mt-1 text-[11px] text-white/55 sm:text-xs">Fill details below. This replaces the old popup.</p>
+                          </div>
+
+                          <div className="rounded-xl border border-white/10 bg-[#0e0e0e] p-3 sm:p-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="sm:col-span-2">
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Company name*</label>
+                                <input
+                                  value={clientProfileDraft.companyName}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, companyName: e.target.value }))}
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Representative</label>
+                                <input
+                                  value={clientProfileDraft.representativeName}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, representativeName: e.target.value }))}
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">WhatsApp*</label>
+                                <input
+                                  value={clientProfileDraft.whatsappNumber}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Source (optional)</label>
+                                <input
+                                  value={clientProfileDraft.source}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, source: e.target.value }))}
+                                  placeholder="Instagram, referral, website..."
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Preferred language</label>
+                                <select
+                                  value={clientProfileDraft.preferredLanguage}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, preferredLanguage: e.target.value }))}
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                >
+                                  <option value="az">AZ</option>
+                                  <option value="en">EN</option>
+                                  <option value="ru">RU</option>
+                                </select>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Preferred currency</label>
+                                <select
+                                  value={clientProfileDraft.preferredCurrency}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, preferredCurrency: e.target.value }))}
+                                  className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                >
+                                  <option value="AZN">AZN</option>
+                                  <option value="USD">USD</option>
+                                  <option value="EUR">EUR</option>
+                                </select>
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Notes (optional)</label>
+                                <textarea
+                                  value={clientProfileDraft.notes}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                                  rows={3}
+                                  className="mt-2 w-full rounded-lg border border-white/12 bg-black px-3 py-2 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-white/10 bg-[#0f0f0f] p-3 sm:p-4">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal Access</p>
+                                <p className="mt-1 text-xs text-white/55">Enable optional client login credentials</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleTogglePortalAccess}
+                                className={`h-9 rounded-lg px-3 text-xs font-semibold transition ${clientProfileDraft.portalEnabled ? "border border-white/20 bg-white/10 text-white" : "border border-white/15 bg-black text-white/80 hover:bg-[#121212]"}`}
+                              >
+                                {clientProfileDraft.portalEnabled ? "Enabled" : "Disabled"}
+                              </button>
+                            </div>
+
+                            <AnimatePresence>
+                              {clientProfileDraft.portalEnabled && (
+                                <motion.div
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: "auto" }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className="grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2"
+                                >
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal username</label>
+                                    <div className="mt-2 flex gap-2">
+                                      <input
+                                        value={clientProfileDraft.portalUsername}
+                                        onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalUsername: e.target.value }))}
+                                        className="h-10 flex-1 rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalUsername: createPortalUsername(prev.companyName, prev.representativeName) }))}
+                                        className="rounded-lg border border-white/15 bg-[#141414] px-2.5 text-[11px] font-semibold text-white/80 hover:bg-[#1a1a1a]"
+                                      >
+                                        Gen
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal password</label>
+                                    <div className="mt-2 flex gap-2">
+                                      <input
+                                        value={clientProfileDraft.portalPassword}
+                                        onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalPassword: e.target.value }))}
+                                        className="h-10 flex-1 rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalPassword: createPortalPassword() }))}
+                                        className="rounded-lg border border-white/15 bg-[#141414] px-2.5 text-[11px] font-semibold text-white/80 hover:bg-[#1a1a1a]"
+                                      >
+                                        Gen
+                                      </button>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+
+                          <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsInlineCreateClientMode(false);
+                                setClientProfileDraft(createEmptyClientProfileDraft());
+                              }}
+                              className="h-9 rounded-lg border border-white/15 bg-[#121212] px-4 text-sm font-semibold text-white/75 transition hover:bg-[#1a1a1a] sm:h-10"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCreateClientFromProfileDraft}
+                              className="h-9 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 sm:h-10"
+                            >
+                              Create Client
+                            </button>
+                          </div>
+                        </motion.div>
+                      ) : isInlineEditClientMode ? (
+                        (() => {
+                          const editingClient = clients.find((c) => c.id === profileClientId || c.id === selectedClientForDetails);
+                          if (!editingClient) return null;
+
+                          return (
+                            <motion.div
+                              key={`profile-edit-${editingClient.id}`}
+                              initial={{ opacity: 0, x: 14 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -14 }}
+                              transition={{ duration: 0.2 }}
+                              className="flex min-h-full flex-col gap-3"
+                            >
+                              <div className="rounded-xl border border-white/10 bg-[#0d0d0d] p-4">
+                                <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Edit Client</p>
+                                <h3 className="mt-1 text-lg font-semibold tracking-tight text-white">{editingClient.brand_name}</h3>
+                                <p className="mt-1 text-xs text-white/55">Update profile details and portal access settings.</p>
+                              </div>
+
+                              <div className="rounded-xl border border-white/10 bg-[#0e0e0e] p-4">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="sm:col-span-2">
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Company name*</label>
+                                    <input
+                                      value={clientProfileDraft.companyName}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, companyName: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Representative</label>
+                                    <input
+                                      value={clientProfileDraft.representativeName}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, representativeName: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">WhatsApp*</label>
+                                    <input
+                                      value={clientProfileDraft.whatsappNumber}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Source (optional)</label>
+                                    <input
+                                      value={clientProfileDraft.source}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, source: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Preferred language</label>
+                                    <select
+                                      value={clientProfileDraft.preferredLanguage}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, preferredLanguage: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    >
+                                      <option value="az">AZ</option>
+                                      <option value="en">EN</option>
+                                      <option value="ru">RU</option>
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Preferred currency</label>
+                                    <select
+                                      value={clientProfileDraft.preferredCurrency}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, preferredCurrency: e.target.value }))}
+                                      className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    >
+                                      <option value="AZN">AZN</option>
+                                      <option value="USD">USD</option>
+                                      <option value="EUR">EUR</option>
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Notes (optional)</label>
+                                    <textarea
+                                      value={clientProfileDraft.notes}
+                                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, notes: e.target.value }))}
+                                      rows={3}
+                                      className="mt-2 w-full rounded-lg border border-white/12 bg-black px-3 py-2 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border border-white/10 bg-[#0f0f0f] p-4">
+                                <div className="mb-3 flex items-center justify-between">
+                                  <div>
+                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal Access</p>
+                                    <p className="mt-1 text-xs text-white/55">Enable/disable login credentials for this client</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleTogglePortalAccess}
+                                    className={`h-9 rounded-lg px-3 text-xs font-semibold transition ${clientProfileDraft.portalEnabled ? "border border-white/20 bg-white/10 text-white" : "border border-white/15 bg-black text-white/80 hover:bg-[#121212]"}`}
+                                  >
+                                    {clientProfileDraft.portalEnabled ? "Enabled" : "Disabled"}
+                                  </button>
+                                </div>
+
+                                <AnimatePresence>
+                                  {clientProfileDraft.portalEnabled && (
+                                    <motion.div
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: "auto" }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      className="grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2"
+                                    >
+                                      <div>
+                                        <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal username</label>
+                                        <div className="mt-2 flex gap-2">
+                                          <input
+                                            value={clientProfileDraft.portalUsername}
+                                            onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalUsername: e.target.value }))}
+                                            className="h-10 flex-1 rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalUsername: createPortalUsername(prev.companyName, prev.representativeName) }))}
+                                            className="rounded-lg border border-white/15 bg-[#141414] px-2.5 text-[11px] font-semibold text-white/80 hover:bg-[#1a1a1a]"
+                                          >
+                                            Gen
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal password</label>
+                                        <div className="mt-2 flex gap-2">
+                                          <input
+                                            value={clientProfileDraft.portalPassword}
+                                            onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalPassword: e.target.value }))}
+                                            className="h-10 flex-1 rounded-lg border border-white/12 bg-black px-3 text-sm text-white outline-none transition hover:border-white/20 focus:border-white/30"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalPassword: createPortalPassword() }))}
+                                            className="rounded-lg border border-white/15 bg-[#141414] px-2.5 text-[11px] font-semibold text-white/80 hover:bg-[#1a1a1a]"
+                                          >
+                                            Gen
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+
+                              <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const targetClientId = profileClientId || selectedClientForDetails || "";
+                                    if (!targetClientId) return;
+
+                                    setConfirmDialog({
+                                      isOpen: true,
+                                      message: "Delete this client and all related projects/invoices?",
+                                      onConfirm: () => {
+                                        void handleDeleteClientProfile(targetClientId);
+                                      },
+                                    });
+                                  }}
+                                  className="mr-auto h-10 rounded-lg border border-red-300/30 bg-red-500/10 px-4 text-sm font-semibold text-red-100 transition hover:bg-red-500/20"
+                                >
+                                  Delete Client
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsInlineEditClientMode(false);
+                                    setProfileClientId("");
+                                  }}
+                                  className="h-10 rounded-lg border border-white/15 bg-[#121212] px-4 text-sm font-semibold text-white/75 transition hover:bg-[#1a1a1a]"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleSaveClientProfileInline}
+                                  className="h-10 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+                                >
+                                  Save Changes
+                                </button>
+                              </div>
+                            </motion.div>
+                          );
+                        })()
+                      ) : (
+                        (() => {
+                          const activeClient = clients.find((c) => c.id === selectedClientForDetails) ?? clients[0];
+                          if (!activeClient) return null;
+
+                          const activeProjects = projects.filter((p) => p.client_id === activeClient.id);
+                          const clientInvoices = projectInvoices.filter((inv: InvoiceRow) => {
+                            const project = projects.find((p) => p.id === inv.project_id);
+                            return project?.client_id === activeClient.id;
+                          });
+                          const paidTotal = clientInvoices.reduce((sum: number, inv: InvoiceRow) => sum + (inv.paid_amount ?? 0), 0);
+                          const outstandingTotal = clientInvoices.reduce((sum: number, inv: InvoiceRow) => {
+                            const amount = Number(inv.amount) || 0;
+                            const paid = Math.min(Number(inv.paid_amount ?? 0), amount);
+                            return sum + Math.max(0, amount - paid);
+                          }, 0);
+                          const clientOverdueCount = clientInvoices.filter((inv: InvoiceRow) => {
+                            if (inv.status === "paid") return false;
+                            if (!inv.due_date) return false;
+                            const dueDate = new Date(inv.due_date);
+                            if (Number.isNaN(dueDate.getTime())) return false;
+                            return dueDate < new Date();
+                          }).length;
+                          const recentClientSessions = decoratedSessions
+                            .filter((session) => session.client_id === activeClient.id)
+                            .slice(0, 4);
+
+                          return (
+                            <motion.div
+                              key={`profile-details-${activeClient.id}`}
+                              initial={{ opacity: 0, x: 14 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -14 }}
+                              transition={{ duration: 0.2 }}
+                              className="flex min-h-full flex-col gap-4"
+                            >
+                              <div className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-[#0e0e0e] p-4">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Profile Details</p>
+                                  <h3 className="mt-1 text-lg font-semibold tracking-tight text-white">{activeClient.brand_name}</h3>
+                                  <p className="mt-1 text-xs text-white/55">{activeClient.username || "No representative"} · {activeClient.whatsapp_number || "No phone"}</p>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  {inferPortalEnabled(activeClient) && (
+                                    <span className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/90">
+                                      Portal Active
+                                    </span>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const inferred = inferPortalEnabled(activeClient);
+                                      const companyName = activeClient.brand_name ?? "";
+                                      const representativeName = activeClient.username ?? "";
+                                      const portalUsername = (activeClient.username ?? "").trim() || createPortalUsername(companyName, representativeName);
+                                      const rawPassword = (activeClient.password ?? "").trim();
+                                      const portalPassword = isDisabledPortalPassword(rawPassword) ? rawPassword.replace(/^DISABLED::/, "") : rawPassword;
+
+                                      setProfileClientId(activeClient.id);
+                                      setClientProfileDraft({
+                                        companyName,
+                                        representativeName,
+                                        whatsappNumber: activeClient.whatsapp_number ?? "",
+                                        portalEnabled: inferred,
+                                        portalUsername,
+                                        portalPassword,
+                                        notes: activeClient.notes ?? "",
+                                        source: activeClient.source ?? "",
+                                        preferredLanguage: activeClient.preferred_language ?? "az",
+                                        preferredCurrency: activeClient.preferred_currency ?? "AZN",
+                                      });
+                                      setIsInlineCreateClientMode(false);
+                                      setIsInlineEditClientMode(true);
+                                    }}
+                                    className="h-8 rounded-lg border border-white/20 bg-[#141414] px-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/85 transition hover:bg-[#1b1b1b]"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-3">
+                                <div className="rounded-xl border border-white/10 bg-[#111111] p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-white/45">Projects</p>
+                                  <p className="mt-1 text-xl font-semibold text-white">{activeProjects.length}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-[#111111] p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-white/45">Invoices</p>
+                                  <p className="mt-1 text-xl font-semibold text-white">{clientInvoices.length}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-[#111111] p-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-white/45">Paid</p>
+                                  <p className="mt-1 text-xl font-semibold text-emerald-300">{formatAzn(paidTotal)}</p>
+                                </div>
+                                <div className="rounded-xl border border-white/10 bg-[#111111] p-3 sm:col-span-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                    <span className="text-white/60">Outstanding: <span className="font-semibold text-amber-200">{formatAzn(outstandingTotal)}</span></span>
+                                    <span className="text-white/60">Overdue invoices: <span className="font-semibold text-white">{clientOverdueCount}</span></span>
+                                    <span className="text-white/60">Portal: <span className="font-semibold text-white">{inferPortalEnabled(activeClient) ? "Enabled" : "Disabled"}</span></span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="hidden gap-3 md:grid md:grid-cols-2">
+                                <div className="rounded-xl border border-white/10 bg-[#0f0f0f] p-3">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Client context</h4>
+                                  <div className="mt-2 space-y-2 text-xs text-white/70">
+                                    <p><span className="text-white/45">Source:</span> {activeClient.source?.trim() || "Not specified"}</p>
+                                    <p><span className="text-white/45">Preferred language:</span> {(activeClient.preferred_language || "AZ").toUpperCase()}</p>
+                                    <p><span className="text-white/45">Preferred currency:</span> {(activeClient.preferred_currency || "AZN").toUpperCase()}</p>
+                                    <p><span className="text-white/45">Notes:</span> {activeClient.notes?.trim() || "No notes"}</p>
+                                  </div>
+                                </div>
+
+                                <div className="rounded-xl border border-white/10 bg-[#0f0f0f] p-3">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Recent activity</h4>
+                                  {recentClientSessions.length > 0 ? (
+                                    <div className="mt-2 space-y-2">
+                                      {recentClientSessions.map((session) => (
+                                        <div key={session.id} className="rounded-lg border border-white/10 bg-[#121212] px-2.5 py-2 text-[11px] text-white/70">
+                                          <p className="font-medium text-white/90">{session.device_label || "Unknown device"}</p>
+                                          <p className="mt-0.5 text-white/55">{session.location_label || "Unknown location"}</p>
+                                          <p className="mt-0.5 text-white/45">{session.last_seen_at ? new Date(session.last_seen_at).toLocaleString() : "No activity timestamp"}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="mt-2 text-xs text-white/45">No portal activity yet.</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="min-h-0 flex-1 rounded-xl border border-white/10 bg-[#0f0f0f] p-3">
+                                <div className="mb-2 flex items-center justify-between">
+                                  <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Recent Invoices</h4>
+                                  <span className="text-[10px] text-white/50">{clientInvoices.length}</span>
+                                </div>
+                                {clientInvoices.length > 0 ? (
+                                  <div className="h-[calc(100%-28px)] space-y-2 overflow-y-auto pr-1">
+                                    {clientInvoices.slice(0, 8).map((invoice: InvoiceRow) => (
+                                      <button
+                                        key={invoice.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveTab("invoices");
+                                          setSelectedInvoiceId(invoice.id);
+                                          const project = projects.find((p) => p.id === invoice.project_id);
+                                          if (project) {
+                                            setSelectedClientId(project.client_id);
+                                            setSelectedProjectId(project.id);
+                                            persistOwnerSelection(project.client_id, project.id);
+                                          }
+                                        }}
+                                        className="w-full rounded-lg border border-white/10 bg-[#121212] px-3 py-2 text-left transition hover:border-white/25 hover:bg-[#181818]"
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="text-xs font-semibold text-white">#{invoice.invoice_number}</p>
+                                          <span className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${invoice.status === "paid" ? "bg-emerald-400/20 text-emerald-200" : invoice.status === "partial" ? "bg-yellow-400/20 text-yellow-200" : "bg-red-400/20 text-red-200"}`}>
+                                            {invoice.status}
+                                          </span>
+                                        </div>
+                                          <p className="mt-0.5 text-[11px] text-white/55">{formatAzn(invoice.amount)}</p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="flex h-[calc(100%-28px)] items-center justify-center rounded-lg border border-dashed border-white/10 text-center">
+                                    <p className="text-xs text-white/45">No invoices for this client.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        })()
+                      )}
+                      </AnimatePresence>
+                    </section>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -5295,9 +6833,30 @@ export default function OwnerPage() {
                                 <motion.button
                                   type="button"
                                   onClick={() => {
+                                    setProjectDraft({
+                                      name: project.name,
+                                      service: project.service,
+                                      status: project.status,
+                                      progress: project.progress,
+                                      startDate: toInputDate(project.start_date),
+                                      deliveryDate: toInputDate(project.delivery_date),
+                                      latestUpdate: project.latest_update ?? "",
+                                    });
+                                    setSelectedProjectId(project.id);
+                                    setIsEditingProject(true);
+                                  }}
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="shrink-0 rounded-lg border border-blue-300/30 bg-blue-500/15 px-3 py-2 text-xs font-semibold text-blue-100 hover:bg-blue-500/25 transition"
+                                >
+                                  Edit
+                                </motion.button>
+                                <motion.button
+                                  type="button"
+                                  onClick={() => {
                                     setConfirmDialog({
                                       isOpen: true,
-                                      message: `Delete project "${project.name}"?`,
+                                      message: `Delete project "${project.name}"? Invoices will be preserved.`,
                                       onConfirm: () => handleDeleteProject(project.id),
                                     });
                                   }}
@@ -5386,6 +6945,175 @@ export default function OwnerPage() {
               </motion.div>
             </motion.div>
           )}
+
+          {/* Edit Project Modal */}
+          <AnimatePresence>
+            {isEditingProject && selectedProjectId && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-6"
+                onClick={() => setIsEditingProject(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.96, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.96, opacity: 0, y: 20 }}
+                  transition={{ type: "spring", damping: 24, stiffness: 280 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full max-w-2xl rounded-[28px] border border-white/15 bg-[#0d0d0d] shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                >
+                  {/* Header */}
+                  <div className="sticky top-0 border-b border-white/10 bg-[#0d0d0d]/95 backdrop-blur-sm px-6 py-4 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-white/50">Edit Project</p>
+                      <h2 className="mt-1 text-lg font-semibold text-white">{projectDraft.name || "Project"}</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingProject(false)}
+                      className="text-white/50 hover:text-white"
+                    >
+                      <X size={20} weight="bold" />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div>
+                      <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Project Name</label>
+                      <input
+                        value={projectDraft.name}
+                        onChange={(e) => setProjectDraft((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="Project name"
+                        className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30 transition"
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Service Type</label>
+                        <select
+                          value={projectDraft.service}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, service: e.target.value as ServiceType }))}
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                        >
+                          {serviceOptions.map((service) => (
+                            <option key={service} value={service}>
+                              {service.toUpperCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Status</label>
+                        <select
+                          value={projectDraft.status}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, status: e.target.value as ProjectStatus }))}
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                        >
+                          {projectStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {projectStatusLabels[language][status]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Progress (%)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={numberInputValue(projectDraft.progress)}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, progress: parseNumberInput(e.target.value) }))}
+                          placeholder="0-100"
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30 transition"
+                        />
+                      </div>
+
+                      <div className="col-span-1" />
+
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Start Date</label>
+                        <input
+                          type="date"
+                          value={projectDraft.startDate}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, startDate: e.target.value }))}
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition [color-scheme:dark]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Delivery Date</label>
+                        <input
+                          type="date"
+                          value={projectDraft.deliveryDate}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, deliveryDate: e.target.value }))}
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition [color-scheme:dark]"
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="text-xs uppercase tracking-wider text-white/60 font-semibold">Latest Update / Notes</label>
+                        <textarea
+                          value={projectDraft.latestUpdate}
+                          onChange={(e) => setProjectDraft((p) => ({ ...p, latestUpdate: e.target.value }))}
+                          placeholder="Latest update or notes..."
+                          className="mt-2 col-span-2 rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30 transition resize-none"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+
+                    {notice && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-lg bg-emerald-500/15 border border-emerald-400/30 px-3 py-2 text-xs text-emerald-200"
+                      >
+                        {notice}
+                      </motion.div>
+                    )}
+
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-lg bg-red-500/15 border border-red-400/30 px-3 py-2 text-xs text-red-200"
+                      >
+                        {error}
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 border-t border-white/10 bg-gradient-to-t from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm flex gap-3 p-6">
+                    <motion.button
+                      type="button"
+                      onClick={() => setIsEditingProject(false)}
+                      whileTap={{ scale: 0.98 }}
+                      className="h-11 flex-1 rounded-lg border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/80 hover:bg-white/10 transition"
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      onClick={handleUpdateProject}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="h-11 flex-1 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition"
+                    >
+                      Save Changes
+                    </motion.button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Client Details Panel - Like Invoice Details */}
           <AnimatePresence>
