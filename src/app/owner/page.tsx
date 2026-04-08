@@ -2531,10 +2531,10 @@ export default function OwnerPage() {
     }`;
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1680px]">
-        <aside className="sticky top-0 hidden h-screen w-[302px] shrink-0 flex-col border-r border-white/10 bg-[#090909] px-5 py-6 xl:flex">
-            <div className="space-y-4 flex-1 flex flex-col">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.08),transparent_52%),#040404] text-white">
+      <div className="relative min-h-screen w-full">
+        <aside className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[288px] flex-col overflow-y-auto border-r border-white/10 bg-[#090909]/95 px-5 py-6 backdrop-blur lg:flex xl:w-[320px]">
+            <div className="flex flex-1 flex-col space-y-4">
               <button
                 type="button"
                 onClick={toggleGeneralMode}
@@ -2616,8 +2616,77 @@ export default function OwnerPage() {
 
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8 xl:px-10">
+        <main className="min-w-0 px-3 py-4 sm:px-5 sm:py-5 lg:ml-[288px] lg:px-7 lg:py-6 xl:ml-[320px] xl:px-10">
       <div className="mx-auto w-full max-w-7xl">
+        <div className="mb-4 rounded-2xl border border-white/10 bg-black/35 p-3 backdrop-blur lg:hidden">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Admin quick controls</p>
+            <button
+              type="button"
+              onClick={toggleGeneralMode}
+              className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                isGeneralMode
+                  ? "border-white bg-white text-black"
+                  : "border-white/15 bg-black/30 text-white/75 hover:border-white/25 hover:text-white"
+              }`}
+            >
+              {isGeneralMode ? "Exit general" : "General view"}
+            </button>
+          </div>
+
+          <div className="mt-3 grid gap-2">
+            <SearchablePicker
+              title={t.activeClient}
+              value={selectedClientId}
+              emptyLabel={t.noClients}
+              placeholder="Search client..."
+              options={clients.map((client) => ({
+                id: client.id,
+                label: client.brand_name,
+                description: `${client.username} · ${client.whatsapp_number}`,
+              }))}
+              onChange={(nextClientId) => {
+                setSelectedClientId(nextClientId);
+                const clientProjects = projects.filter((project) => project.client_id === nextClientId);
+                const nextProjectId = clientProjects[0]?.id ?? "";
+                setSelectedProjectId(nextProjectId);
+                setLastScopedSelection({ clientId: nextClientId, projectId: nextProjectId });
+                setInvoiceTargetClientId(nextClientId);
+                setInvoiceTargetProjectId(nextProjectId);
+                persistOwnerSelection(nextClientId, nextProjectId);
+              }}
+            />
+
+            <SearchablePicker
+              title={t.activeProject}
+              value={selectedProjectId}
+              emptyLabel={t.noProjects}
+              placeholder="Search project..."
+              options={filteredProjects.map((project) => ({
+                id: project.id,
+                label: project.name,
+                description: `${project.service.toUpperCase()} · ${projectStatusLabels[language][project.status]} · ${project.progress}%`,
+              }))}
+              onChange={(nextProjectId) => {
+                setSelectedProjectId(nextProjectId);
+                if (selectedClientId) {
+                  setLastScopedSelection({ clientId: selectedClientId, projectId: nextProjectId });
+                }
+                setInvoiceTargetProjectId(nextProjectId);
+                persistOwnerSelection(selectedClientId, nextProjectId);
+              }}
+            />
+          </div>
+
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {visibleTabItems.map((item) => (
+              <button key={`mobile-${item.key}`} type="button" onClick={() => setActiveTab(item.key)} className={`${tabButtonClass(item.key)} whitespace-nowrap`}>
+                {t[item.key]}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="mb-8">
           <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{t.title}</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">{t.clientContext}</h1>
