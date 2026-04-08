@@ -1453,7 +1453,7 @@ export default function InvoicesPage() {
                           whileTap={{ scale: 0.998 }}
                           type="button"
                           onClick={() => setActiveInvoiceId(record.invoice.id)}
-                          className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3.5 text-left transition-all duration-300 hover:border-white/25 sm:px-4"
+                          className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3.5 text-left transition-all duration-300 hover:border-white/25 sm:px-4 lg:rounded-none lg:border-x-0 lg:border-t-0 lg:border-b lg:bg-transparent lg:px-2 lg:py-4 lg:hover:border-white/18"
                         >
                           <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/[0.02] via-white/[0.04] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -1469,17 +1469,13 @@ export default function InvoicesPage() {
                               </p>
                             </div>
 
-                            <div className="relative z-[1] flex items-end justify-between gap-4 sm:block sm:text-right">
+                            <div className="relative z-[1] flex flex-col items-end gap-2 text-right">
                               <p className="text-2xl font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white sm:text-3xl">{formatAzn(record.invoice.amount)}</p>
-                              <div className="text-right sm:text-right">
                               <span
-                                className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${statusStyles[record.invoice.status]}`}
+                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${statusStyles[record.invoice.status]}`}
                               >
                                 {getStatusLabel(record.invoice.status)}
                               </span>
-                              <p className="mt-1.5 text-[11px] text-white/60">Paid: {formatAzn(rowPaid)}</p>
-                              <p className="text-[11px] text-white/45">Remaining: {formatAzn(rowBalance)}</p>
-                              </div>
                             </div>
                           </div>
                         </motion.button>
