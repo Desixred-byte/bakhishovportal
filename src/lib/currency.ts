@@ -1,12 +1,12 @@
 export function formatAzn(amount: number | string | null | undefined) {
-  if (amount === null || amount === undefined) return "AZN 0";
+  if (amount === null || amount === undefined) return "0 AZN";
 
   const numericAmount =
     typeof amount === "number"
       ? amount
       : Number(String(amount).replace(/[^\d.-]/g, ""));
 
-  if (!Number.isFinite(numericAmount)) return "AZN 0";
+  if (!Number.isFinite(numericAmount)) return "0 AZN";
 
-  return `AZN ${numericAmount.toLocaleString("en-US")}`;
+  return `${numericAmount.toLocaleString("en-US")} AZN`;
 }

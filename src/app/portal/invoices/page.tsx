@@ -340,7 +340,7 @@ const pdfImageCache = new Map<string, Promise<string | null>>();
 let pdfFontReadyPromise: Promise<boolean> | null = null;
 
 function formatAznPdf(amount: number) {
-  return `AZN ${new Intl.NumberFormat("en-US").format(amount)}`;
+  return `${new Intl.NumberFormat("en-US").format(amount)} AZN`;
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer) {
@@ -478,7 +478,7 @@ function PremiumFilterSelect({
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="relative min-w-[170px]">
+    <div className="relative w-full min-w-0 sm:min-w-[170px]">
       <button
         type="button"
         onClick={onToggle}
@@ -501,7 +501,7 @@ function PremiumFilterSelect({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-64 overflow-auto rounded-2xl border border-white/15 bg-[#0d1119] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.38)]"
+            className="mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-white/15 bg-[#0d1119] p-2 shadow-[0_16px_40px_rgba(0,0,0,0.38)] sm:absolute sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0"
           >
             {options.map((option) => {
               const active = option.value === selectedValue;
@@ -1096,8 +1096,8 @@ export default function InvoicesPage() {
 
         {!activeInvoiceRecord && (
         <>
-        <div className="-mx-1 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.visibleInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1112,7 +1112,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
+          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.openBalance}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1127,7 +1127,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="min-w-[220px] snap-start rounded-3xl border border-amber-400/20 bg-amber-400/12 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
+          <div className="w-full rounded-3xl border border-amber-400/20 bg-amber-400/12 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.paidTotal}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1142,7 +1142,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
+          <div className="w-full rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.overdueInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1169,11 +1169,11 @@ export default function InvoicesPage() {
               <p className="mt-1 text-sm text-white/55">{filteredInvoices.length} {copy.matchingInvoices}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={() => setIsMobileFiltersOpen((value) => !value)}
-                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 sm:hidden"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 sm:hidden"
               >
                 {copy.show} {copy.filters}
                 <CaretDown className={`h-4 w-4 transition-transform duration-200 ${isMobileFiltersOpen ? "rotate-180" : ""}`} />
@@ -1183,7 +1183,7 @@ export default function InvoicesPage() {
                 type="button"
                 onClick={() => downloadFilteredReportPdf(filteredInvoices)}
                 disabled={filteredInvoices.length === 0}
-                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 text-sm font-semibold tracking-tight text-white transition-all duration-200 hover:bg-black/60 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-black/45 px-4 text-sm font-semibold tracking-tight text-white transition-all duration-200 hover:bg-black/60 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
               >
                 <DownloadSimple className="h-4 w-4" weight="bold" />
                 {copy.exportPdf}
@@ -1206,7 +1206,7 @@ export default function InvoicesPage() {
                       setIssueTo("");
                       setOpenFilter(null);
                     }}
-                    className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/20 bg-black/20 px-4 text-sm font-semibold tracking-tight text-white transition-all duration-200 hover:bg-black/30"
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-black/20 px-4 text-sm font-semibold tracking-tight text-white transition-all duration-200 hover:bg-black/30 sm:w-auto"
                   >
                     <X className="h-4 w-4" />
                     {copy.reset}
@@ -1222,7 +1222,7 @@ export default function InvoicesPage() {
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="overflow-hidden sm:!opacity-100 sm:!h-auto sm:!mt-4"
           >
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
             <div className="relative min-w-0">
               <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" weight="bold" />
               <input
@@ -1292,7 +1292,7 @@ export default function InvoicesPage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 340, damping: 28 }}
-                    className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(340px,calc(100vw-2rem))] rounded-2xl border border-white/15 bg-[#0d1119] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.42)]"
+                    className="mt-2 w-full rounded-2xl border border-white/15 bg-[#0d1119] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.42)] sm:absolute sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[min(340px,calc(100vw-2rem))]"
                   >
                     <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.issueDateRange}</p>
 
