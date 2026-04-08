@@ -1219,7 +1219,7 @@ export default function InvoicesPage() {
             initial={false}
             animate={isMobileFiltersOpen ? { opacity: 1, height: "auto", marginTop: 16 } : { opacity: 0, height: 0, marginTop: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="overflow-hidden sm:!overflow-visible sm:!opacity-100 sm:!h-auto sm:!mt-4"
+            className="overflow-visible sm:!overflow-visible sm:!opacity-100 sm:!h-auto sm:!mt-4"
           >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
             <div className="relative min-w-0">
@@ -1293,11 +1293,11 @@ export default function InvoicesPage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
                     transition={{ type: "spring", stiffness: 340, damping: 28 }}
-                    className="mt-2 w-full rounded-[20px] border border-white/10 bg-[#0a0a0b] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.62)] sm:absolute sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[min(340px,calc(100vw-2rem))] sm:z-[80]"
+                    className="absolute left-0 right-0 top-[calc(100%+8px)] z-[90] w-full rounded-[20px] border border-white/10 bg-[#0a0a0b] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.62)] sm:left-auto sm:right-0 sm:mt-0 sm:w-[min(340px,calc(100vw-2rem))] sm:p-5"
                   >
                     <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.issueDateRange}</p>
 
-                    <div className="mt-3 grid grid-cols-2 gap-4">
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                       <div>
                         <label className="text-[10px] uppercase tracking-[0.12em] text-white/45">{copy.from}</label>
                         <input
