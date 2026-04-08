@@ -20,6 +20,7 @@ export type Invoice = {
   dueDate: string;
   metadata?: {
     customerName?: string;
+    customerPhone?: string;
     customerEmail?: string;
     customerAddress?: string;
     discountType?: "percent" | "fixed";

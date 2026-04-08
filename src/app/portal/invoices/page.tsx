@@ -815,7 +815,7 @@ export default function InvoicesPage() {
     const balanceDue = Math.max(totalAfterDiscount - paidAmount, 0);
     const billToName = toPdfSafeText(meta?.customerName || meta?.companyName || effectiveProjectLabel);
     const billToCompany = toPdfSafeText(meta?.companyName || "");
-    const billToEmail = toPdfSafeText(meta?.customerEmail || "");
+    const billToPhone = toPdfSafeText(meta?.customerPhone || "");
     const billToAddress = toPdfSafeText(meta?.customerAddress || meta?.companyName || "Bakhishov Brands");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -912,8 +912,8 @@ export default function InvoicesPage() {
     if (billToCompany && billToCompany !== billToName) {
       doc.text(billToCompany, leftCardX + 14, infoY + 43);
     }
-    if (billToEmail) {
-      doc.text(billToEmail, leftCardX + 14, infoY + 53);
+    if (billToPhone) {
+      doc.text(billToPhone, leftCardX + 14, infoY + 53);
     } else if (billToCompany && billToCompany !== billToName) {
       doc.text(billToAddress, leftCardX + 14, infoY + 53);
     }
