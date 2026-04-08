@@ -894,39 +894,47 @@ export default function InvoicesPage() {
     doc.roundedRect(leftCardX, infoY, cardWidth, cardHeight, 10, 10, "FD");
     doc.roundedRect(rightCardX, infoY, cardWidth, cardHeight, 10, 10, "FD");
 
-    // Left card: Customer info
-    doc.setFont(pdfFont, "bold");
-    doc.setTextColor(...bodyText);
-    doc.setFontSize(11);
-    doc.text(billToName, leftCardX + 14, infoY + 16);
-    
-    doc.setFont(pdfFont, "normal");
-    doc.setTextColor(130, 130, 130);
-    doc.setFontSize(9);
-    doc.text(billToAddress, leftCardX + 14, infoY + 30);
-    
-    doc.setFont(pdfFont, "normal");
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 42);
-    doc.text("Müştəri Məlumatlar", leftCardX + 14, infoY + 56);
-
-    // Right card: Project info
+    // Left card: Customer info header and details
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...navy);
-    doc.setFontSize(9.5);
-    doc.text("Layihə Detalları", rightCardX + 14, infoY + 16);
+    doc.setFontSize(11);
+    doc.text("Müştəri Məlumatlar", leftCardX + 14, infoY + 18);
     
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...bodyText);
     doc.setFontSize(10.5);
-    doc.text(toPdfSafeText(effectiveProjectLabel), rightCardX + 14, infoY + 33);
+    doc.text(billToName, leftCardX + 14, infoY + 35);
+    
+    doc.setFont(pdfFont, "normal");
+    doc.setTextColor(130, 130, 130);
+    doc.setFontSize(8.5);
+    doc.text(billToAddress, leftCardX + 14, infoY + 48);
     
     doc.setFont(pdfFont, "normal");
     doc.setTextColor(150, 150, 150);
     doc.setFontSize(8);
-    doc.text(getPdfDisplayService(effectiveService || project.service), rightCardX + 14, infoY + 45);
-    doc.text(formatDate(project.deliveryDate), rightCardX + 14, infoY + 56);
+    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 60);
+
+    // Right card: Project info header and details
+    doc.setFont(pdfFont, "bold");
+    doc.setTextColor(...navy);
+    doc.setFontSize(11);
+    doc.text("Layihə Detalları", rightCardX + 14, infoY + 18);
+    
+    doc.setFont(pdfFont, "bold");
+    doc.setTextColor(...bodyText);
+    doc.setFontSize(10.5);
+    doc.text(toPdfSafeText(effectiveProjectLabel), rightCardX + 14, infoY + 35);
+    
+    doc.setFont(pdfFont, "normal");
+    doc.setTextColor(130, 130, 130);
+    doc.setFontSize(8.5);
+    doc.text(getPdfDisplayService(effectiveService || project.service), rightCardX + 14, infoY + 48);
+    
+    doc.setFont(pdfFont, "normal");
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.text(formatDate(project.deliveryDate), rightCardX + 14, infoY + 60);
 
     autoTable(doc, {
       startY: infoY + cardHeight + 20,
