@@ -31,6 +31,13 @@ export const metadata: Metadata = {
     siteName: "Bakhishov Brands",
     images: [
       {
+        url: "https://app.bakhishov.com/webthumb.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Bakhishov Brands Portal",
+        type: "image/jpeg",
+      },
+      {
         url: "https://app.bakhishov.com/webthumb.png",
         width: 1200,
         height: 630,
@@ -44,7 +51,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Bakhishov Brands Portal",
     description: "Track project progress, invoices, deliverables, and updates in one premium workspace.",
-    images: ["https://app.bakhishov.com/webthumb.png"],
+    images: ["https://app.bakhishov.com/webthumb.jpg"],
   },
 };
 
