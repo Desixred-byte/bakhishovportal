@@ -1076,7 +1076,7 @@ export default function InvoicesPage() {
 
   return (
     <>
-      <div className={`w-full max-w-7xl overflow-x-hidden ${activeInvoiceRecord ? "xl:flex xl:h-[calc(100dvh-6rem)] xl:flex-col" : ""}`}>
+      <div className={`font-sans w-full max-w-7xl overflow-x-hidden ${activeInvoiceRecord ? "xl:flex xl:h-[calc(100dvh-6rem)] xl:flex-col" : ""}`}>
         <div className="flex flex-col gap-3">
           <div>
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.billing}</p>
@@ -1473,7 +1473,7 @@ export default function InvoicesPage() {
                             <div className="relative z-[1] flex flex-col items-end gap-2 text-right">
                               <p className="text-2xl font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white sm:text-3xl">{formatAzn(record.invoice.amount)}</p>
                               <span
-                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${statusStyles[record.invoice.status]}`}
+                                className={`inline-flex min-h-7 max-w-[9.5rem] items-center justify-center rounded-full border px-2.5 py-1 text-center text-[10px] font-medium leading-none tracking-tight capitalize whitespace-nowrap ${statusStyles[record.invoice.status]}`}
                               >
                                 {getStatusLabel(record.invoice.status)}
                               </span>
@@ -1558,7 +1558,7 @@ export default function InvoicesPage() {
                           </div>
                           <div>
                             <p className="text-[11px] uppercase tracking-[0.14em] text-white/40">{copy.status}</p>
-                            <p className="mt-2 text-lg font-semibold tracking-tight text-white capitalize">
+                            <p className="mt-2 inline-flex min-h-7 max-w-full items-center justify-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-sm font-semibold tracking-tight text-white capitalize leading-none">
                               {getStatusLabel(activeInvoiceRecord.invoice.status)}
                             </p>
                           </div>
