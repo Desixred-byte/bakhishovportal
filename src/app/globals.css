@@ -1,20 +1,25 @@
 @import "tailwindcss";
 
 :root {
+  --background: #000000;
+  --foreground: #ededed;
+}
+
+:root[data-theme="light"] {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #000000;
     --foreground: #ededed;
   }
 }
@@ -22,5 +27,83 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-gutter: stable;
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] .portal-theme {
+  background: #ffffff;
+}
+
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background: #ffffff;
+}
+
+html[data-theme="light"] .portal-theme [class*="bg-black"] {
+  background-color: rgba(15, 23, 42, 0.045) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="bg-white/["] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+html[data-theme="light"] .portal-theme input[type="date"] {
+  color-scheme: light;
+}
+
+html[data-theme="light"] .portal-theme [class*="text-white"] {
+  color: rgba(15, 23, 42, 0.92) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="text-white/"] {
+  color: rgba(15, 23, 42, 0.62) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="bg-blue"] {
+  background-color: rgba(31, 41, 55, 0.08) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="border-blue"] {
+  border-color: rgba(31, 41, 55, 0.18) !important;
+}
+
+html[data-theme="light"] .portal-theme [class*="text-blue"] {
+  color: rgba(31, 41, 55, 0.9) !important;
+}
+
+html[data-theme="dark"] .portal-theme input[type="date"] {
+  color-scheme: dark;
+}
+
+.portal-theme,
+.portal-theme * {
+  transition-property: background-color, border-color, color;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #fff;
 }
