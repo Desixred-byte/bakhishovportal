@@ -736,6 +736,9 @@ export default function InvoicesPage() {
     { value: "unpaid", label: copy.unpaid },
   ];
 
+  const showInvoiceListPanel = !isCompactViewport || !activeInvoiceRecord;
+  const canToggleListPanel = Boolean(activeInvoiceRecord) && !isCompactViewport;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -757,9 +760,7 @@ export default function InvoicesPage() {
       return;
     }
 
-    if (activeInvoiceId) {
-      setIsInvoiceListMinimized(true);
-    }
+    setIsInvoiceListMinimized(false);
   }, [activeInvoiceId, isCompactViewport]);
 
   useEffect(() => {
@@ -1343,12 +1344,15 @@ export default function InvoicesPage() {
           transition={{ type: "spring", stiffness: 180, damping: 26 }}
           className={`${activeInvoiceRecord ? "xl:mt-4 xl:flex-1 xl:min-h-0" : "mt-6"} grid gap-6 ${
             activeInvoiceRecord
-              ? isInvoiceListMinimized
-                ? "xl:grid-cols-[72px_minmax(0,1fr)]"
-                : "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]"
+              ? showInvoiceListPanel
+                ? isInvoiceListMinimized
+                  ? "xl:grid-cols-[72px_minmax(0,1fr)]"
+                  : "xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]"
+                : "xl:grid-cols-1"
               : "xl:grid-cols-1"
           } ${activeInvoiceRecord ? "xl:h-full xl:min-h-0 xl:overflow-hidden" : ""} items-start overflow-x-hidden`}
         >
+          {showInvoiceListPanel && (
           <motion.div
             layout
             transition={{ type: "spring", stiffness: 220, damping: 28 }}
@@ -1381,14 +1385,14 @@ export default function InvoicesPage() {
                 )}
               </AnimatePresence>
               <div className={`flex items-center gap-2 ${isInvoiceListMinimized ? "w-full justify-center" : ""}`}>
-                {activeInvoiceRecord && (
+                {canToggleListPanel && (
                   <button
                     type="button"
                     onClick={() => setIsInvoiceListMinimized((value) => !value)}
-                    className={`inline-flex h-9 items-center rounded-full border border-white/10 bg-black/30 text-[11px] uppercase tracking-[0.12em] text-white/65 transition-all duration-200 hover:border-white/20 hover:bg-black/40 hover:text-white ${isInvoiceListMinimized ? "w-9 justify-center px-0" : "gap-2 px-3"}`}
+                    className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 text-[11px] uppercase tracking-[0.12em] text-white/65 transition-all duration-200 hover:border-white/20 hover:bg-black/40 hover:text-white"
                   >
                     <CaretDown className={`h-3.5 w-3.5 transition-transform ${isInvoiceListMinimized ? "-rotate-90" : "rotate-0"}`} weight="bold" />
-                    {!isInvoiceListMinimized && copy.minimize}
+                    {isInvoiceListMinimized ? copy.show : copy.minimize}
                   </button>
                 )}
               </div>
@@ -1480,6 +1484,7 @@ export default function InvoicesPage() {
               )}
             </AnimatePresence>
           </motion.div>
+          )}
 
           <AnimatePresence>
             {activeInvoiceRecord && (
