@@ -813,9 +813,9 @@ export default function InvoicesPage() {
       Math.min(totalAfterDiscount, invoice.paidAmount ?? (invoice.status === "paid" ? totalAfterDiscount : 0))
     );
     const balanceDue = Math.max(totalAfterDiscount - paidAmount, 0);
-    const billToName = toPdfSafeText(meta?.customerName || effectiveProjectLabel);
+    const billToName = toPdfSafeText(meta?.customerName || meta?.companyName || effectiveProjectLabel);
     const billToEmail = toPdfSafeText(meta?.customerEmail || "");
-    const billToAddress = toPdfSafeText(meta?.customerAddress || "Bakhishov Brands");
+    const billToAddress = toPdfSafeText(meta?.customerAddress || meta?.companyName || "Bakhishov Brands");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 30;
@@ -898,7 +898,7 @@ export default function InvoicesPage() {
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...navy);
     doc.setFontSize(11);
-    doc.text("Müştəri Məlumatlar", leftCardX + 14, infoY + 18);
+    doc.text("Müştəri Məlumatları", leftCardX + 14, infoY + 18);
     
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...bodyText);
