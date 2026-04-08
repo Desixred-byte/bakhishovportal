@@ -1096,9 +1096,10 @@ export default function InvoicesPage() {
 
         {!activeInvoiceRecord && (
         <>
-        <div className="mt-8 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4 sm:gap-3">
-          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.visibleInvoices}</p>
+        <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-2 xl:grid-cols-4 sm:gap-3">
+          <div className="relative w-full overflow-hidden rounded-2xl border border-white/12 bg-white/[0.03] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+            <p className="text-[9px] uppercase tracking-[0.18em] text-white/38 sm:text-[10px] sm:tracking-[0.16em] sm:text-white/42">{copy.visibleInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`count-${filteredInvoices.length}`}
@@ -1106,14 +1107,15 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
+                className="mt-2 text-[1.55rem] font-semibold leading-none tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {filteredInvoices.length}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.openBalance}</p>
+          <div className="relative w-full overflow-hidden rounded-2xl border border-white/12 bg-white/[0.03] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+            <p className="text-[9px] uppercase tracking-[0.18em] text-white/38 sm:text-[10px] sm:tracking-[0.16em] sm:text-white/42">{copy.openBalance}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`open-${openBalance}`}
@@ -1121,14 +1123,15 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
+                className="mt-2 text-[1.25rem] font-semibold leading-none tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {formatAzn(openBalance)}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-2xl border border-amber-400/20 bg-amber-400/12 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.paidTotal}</p>
+          <div className="relative w-full overflow-hidden rounded-2xl border border-amber-400/18 bg-gradient-to-br from-amber-400/14 to-black/40 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-amber-300/20" />
+            <p className="text-[9px] uppercase tracking-[0.18em] text-white/38 sm:text-[10px] sm:tracking-[0.16em] sm:text-white/42">{copy.paidTotal}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`paid-${paidTotal}`}
@@ -1136,14 +1139,15 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
+                className="mt-2 text-[1.25rem] font-semibold leading-none tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {formatAzn(paidTotal)}
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="w-full rounded-2xl border border-white/12 bg-black/70 p-3.5 shadow-[0_12px_30px_rgba(0,0,0,0.28)] sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-white/42">{copy.overdueInvoices}</p>
+          <div className="relative w-full overflow-hidden rounded-2xl border border-white/12 bg-white/[0.03] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm sm:rounded-3xl sm:p-6 sm:shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+            <div className="absolute inset-x-0 top-0 h-px bg-white/10" />
+            <p className="text-[9px] uppercase tracking-[0.18em] text-white/38 sm:text-[10px] sm:tracking-[0.16em] sm:text-white/42">{copy.overdueInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
                 key={`overdue-${overdueCount}`}
@@ -1151,7 +1155,7 @@ export default function InvoicesPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="mt-2 text-2xl font-semibold tracking-tight text-white sm:mt-4 sm:text-3xl"
+                className="mt-2 text-[1.55rem] font-semibold leading-none tracking-tight text-white sm:mt-4 sm:text-3xl"
               >
                 {overdueCount}
               </motion.p>
