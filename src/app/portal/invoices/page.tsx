@@ -896,26 +896,26 @@ export default function InvoicesPage() {
 
     // Left card: Customer info
     doc.setFont(pdfFont, "bold");
-    doc.setTextColor(...navy);
-    doc.setFontSize(9.5);
-    doc.text("MÜŞTƏRI MƏLUMATLAR", leftCardX + 14, infoY + 16);
-    
-    doc.setFont(pdfFont, "bold");
     doc.setTextColor(...bodyText);
-    doc.setFontSize(10.5);
-    doc.text(billToName, leftCardX + 14, infoY + 33);
+    doc.setFontSize(11);
+    doc.text(billToName, leftCardX + 14, infoY + 16);
+    
+    doc.setFont(pdfFont, "normal");
+    doc.setTextColor(130, 130, 130);
+    doc.setFontSize(9);
+    doc.text(billToAddress, leftCardX + 14, infoY + 30);
     
     doc.setFont(pdfFont, "normal");
     doc.setTextColor(150, 150, 150);
     doc.setFontSize(8);
-    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 45);
-    doc.text(billToAddress, leftCardX + 14, infoY + 56);
+    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 42);
+    doc.text("Müştəri Məlumatlar", leftCardX + 14, infoY + 56);
 
     // Right card: Project info
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...navy);
     doc.setFontSize(9.5);
-    doc.text("LAYIHƏ MƏLUMATLAR", rightCardX + 14, infoY + 16);
+    doc.text("Layihə Detalları", rightCardX + 14, infoY + 16);
     
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...bodyText);
