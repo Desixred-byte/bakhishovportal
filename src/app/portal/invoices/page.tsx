@@ -897,37 +897,35 @@ export default function InvoicesPage() {
     // Left card: Customer info
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...navy);
-    doc.setFontSize(10);
-    doc.text("MÜŞTƏRI", leftCardX + 14, infoY + 18);
+    doc.setFontSize(9.5);
+    doc.text("MÜŞTƏRI MƏLUMATLAR", leftCardX + 14, infoY + 16);
+    
+    doc.setFont(pdfFont, "bold");
+    doc.setTextColor(...bodyText);
+    doc.setFontSize(10.5);
+    doc.text(billToName, leftCardX + 14, infoY + 33);
     
     doc.setFont(pdfFont, "normal");
-    doc.setTextColor(...bodyText);
-    doc.setFontSize(9.5);
-    doc.text(billToName, leftCardX + 14, infoY + 32);
-    if (billToEmail) {
-      doc.setTextColor(120, 120, 120);
-      doc.setFontSize(8);
-      doc.text(billToEmail, leftCardX + 14, infoY + 44);
-    }
-    doc.setTextColor(...bodyText);
-    doc.setFontSize(8.5);
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 45);
     doc.text(billToAddress, leftCardX + 14, infoY + 56);
 
     // Right card: Project info
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...navy);
-    doc.setFontSize(10);
-    doc.text("LAYIHƏ MƏLUMATLAR", rightCardX + 14, infoY + 18);
+    doc.setFontSize(9.5);
+    doc.text("LAYIHƏ MƏLUMATLAR", rightCardX + 14, infoY + 16);
+    
+    doc.setFont(pdfFont, "bold");
+    doc.setTextColor(...bodyText);
+    doc.setFontSize(10.5);
+    doc.text(toPdfSafeText(effectiveProjectLabel), rightCardX + 14, infoY + 33);
     
     doc.setFont(pdfFont, "normal");
-    doc.setTextColor(...bodyText);
-    doc.setFontSize(9.5);
-    doc.text(toPdfSafeText(effectiveProjectLabel), rightCardX + 14, infoY + 32);
-    doc.setTextColor(120, 120, 120);
+    doc.setTextColor(150, 150, 150);
     doc.setFontSize(8);
-    doc.text(getPdfDisplayService(effectiveService || project.service), rightCardX + 14, infoY + 44);
-    doc.setTextColor(...bodyText);
-    doc.setFontSize(8);
+    doc.text(getPdfDisplayService(effectiveService || project.service), rightCardX + 14, infoY + 45);
     doc.text(formatDate(project.deliveryDate), rightCardX + 14, infoY + 56);
 
     autoTable(doc, {
