@@ -764,6 +764,14 @@ export default function InvoicesPage() {
   }, [activeInvoiceId, isCompactViewport]);
 
   useEffect(() => {
+    if (!isCompactViewport || !activeInvoiceId || typeof window === "undefined") return;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [activeInvoiceId, isCompactViewport]);
+
+  useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (filterBarRef.current && !filterBarRef.current.contains(event.target as Node)) {
         setOpenFilter(null);
