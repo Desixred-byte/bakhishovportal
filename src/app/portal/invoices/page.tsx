@@ -249,6 +249,7 @@ type InvoiceLineItem = {
 
 type InvoiceMeta = {
   customerName?: string;
+  customerPhone?: string;
   customerEmail?: string;
   customerAddress?: string;
   discountType?: "percent" | "fixed";
@@ -330,7 +331,7 @@ const pdfSafeStatusLabels: Record<string, string> = {
 };
 
 const pdfImageCache = new Map<string, Promise<string | null>>();
-let pdfFontReadyPromise: Promise<boolean> | null = null;
+let pdfFontFilesPromise: Promise<{ regular: string; semibold: string } | null> | null = null;
 
 function formatAznPdf(amount: number) {
   return `${new Intl.NumberFormat("en-US").format(amount)} AZN`;
@@ -361,34 +362,41 @@ function loadPublicBinary(path: string): Promise<ArrayBuffer | null> {
 }
 
 async function ensureMontserratFont(doc: jsPDF) {
-  if (!pdfFontReadyPromise) {
-    pdfFontReadyPromise = Promise.all([
+  if (!pdfFontFilesPromise) {
+    pdfFontFilesPromise = Promise.all([
       loadPublicBinary("/fonts/Montserrat-Regular.ttf"),
       loadPublicBinary("/fonts/Montserrat-SemiBold.ttf"),
     ])
       .then(([regular, semibold]) => {
-        if (!regular || !semibold) return false;
-
-        const pdfDoc = doc as jsPDF & {
-          addFileToVFS: (filename: string, filecontent: string) => void;
-          addFont: (postScriptName: string, id: string, fontStyle: string) => void;
-          getFontList: () => Record<string, unknown>;
+        if (!regular || !semibold) return null;
+        return {
+          regular: arrayBufferToBase64(regular),
+          semibold: arrayBufferToBase64(semibold),
         };
-
-        const fontList = pdfDoc.getFontList?.();
-        if (!fontList || !fontList.Montserrat) {
-          pdfDoc.addFileToVFS("Montserrat-Regular.ttf", arrayBufferToBase64(regular));
-          pdfDoc.addFileToVFS("Montserrat-SemiBold.ttf", arrayBufferToBase64(semibold));
-          pdfDoc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
-          pdfDoc.addFont("Montserrat-SemiBold.ttf", "Montserrat", "bold");
-        }
-
-        return true;
       })
-      .catch(() => false);
+      .catch(() => null);
   }
 
-  return pdfFontReadyPromise;
+  const fontFiles = await pdfFontFilesPromise;
+  if (!fontFiles) return false;
+
+  const pdfDoc = doc as jsPDF & {
+    addFileToVFS: (filename: string, filecontent: string) => void;
+    addFont: (postScriptName: string, id: string, fontStyle: string) => void;
+    getFontList: () => Record<string, unknown>;
+  };
+
+  const fontList = pdfDoc.getFontList?.();
+  const hasMontserrat = Boolean(fontList && (fontList as Record<string, unknown>).Montserrat);
+
+  if (!hasMontserrat) {
+    pdfDoc.addFileToVFS("Montserrat-Regular.ttf", fontFiles.regular);
+    pdfDoc.addFileToVFS("Montserrat-SemiBold.ttf", fontFiles.semibold);
+    pdfDoc.addFont("Montserrat-Regular.ttf", "Montserrat", "normal");
+    pdfDoc.addFont("Montserrat-SemiBold.ttf", "Montserrat", "bold");
+  }
+
+  return true;
 }
 
 function toPdfSafeText(value: string) {
@@ -540,6 +548,7 @@ export default function InvoicesPage() {
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [openFilter, setOpenFilter] = useState<"service" | "project" | "status" | "date" | null>(null);
   const filterBarRef = useRef<HTMLDivElement>(null);
+  const isGeneratingInvoicePdfRef = useRef(false);
 
   const invoiceRecords = useMemo<InvoiceRecord[]>(() => {
     if (!client) return [];
@@ -1026,15 +1035,19 @@ export default function InvoicesPage() {
   }
 
   async function handleDownloadPdf() {
+    if (isGeneratingInvoicePdfRef.current) return;
+
     const project = activeInvoiceRecord?.project;
     const invoice = activeInvoiceRecord?.invoice;
 
     if (!project || !invoice) return;
+    isGeneratingInvoicePdfRef.current = true;
     setIsDownloadingPdf(true);
     try {
       const doc = await createInvoicePdfDoc(project, invoice, invoice.metadata ?? undefined);
       doc.save(`${invoice.invoiceNumber}-${project.name.replace(/\s+/g, "-").toLowerCase()}.pdf`);
     } finally {
+      isGeneratingInvoicePdfRef.current = false;
       setIsDownloadingPdf(false);
     }
   }
