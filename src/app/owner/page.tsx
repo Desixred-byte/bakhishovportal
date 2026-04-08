@@ -1096,6 +1096,7 @@ export default function OwnerPage() {
   const [isClientProjectsModalOpen, setIsClientProjectsModalOpen] = useState(false);
   const [profileClientId, setProfileClientId] = useState("");
   const [clientProfileDraft, setClientProfileDraft] = useState<ClientProfileDraft>(createEmptyClientProfileDraft());
+  const [profilesViewMode, setProfilesViewMode] = useState<"grid" | "rows">("grid");
 
   const [deliverableForm, setDeliverableForm] = useState({
     title: "",
@@ -4648,31 +4649,64 @@ export default function OwnerPage() {
 
             {activeTab === "profiles" && (
               <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-6">
-                {/* Header with Create Button */}
-                <div className="flex items-center justify-between gap-4">
+                {/* Header with Create Button and View Toggle */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div>
                     <h2 className="text-2xl font-semibold tracking-tight text-white">Client Profiles</h2>
                     <p className="mt-1 text-sm text-white/50">Manage all your client information and projects</p>
                   </div>
-                  <motion.button
-                    type="button"
-                    onClick={() => {
-                      setProfileClientId("");
-                      setClientProfileDraft(createEmptyClientProfileDraft());
-                      setIsClientProfileOpen(true);
-                    }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="group relative h-12 rounded-xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 px-6 text-sm font-semibold text-white shadow-lg transition hover:border-white/30 hover:shadow-xl hover:shadow-white/10"
-                  >
-                    <span className="relative flex items-center gap-2">
-                      <span className="text-lg">+</span>
-                      New Profile
-                    </span>
-                  </motion.button>
+                  <div className="flex items-center gap-3">
+                    {/* View Toggle */}
+                    <div className="flex items-center gap-1 rounded-lg border border-white/15 bg-white/5 p-1">
+                      <motion.button
+                        type="button"
+                        onClick={() => setProfilesViewMode("grid")}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`px-3 py-2 rounded-md text-sm font-semibold transition ${
+                          profilesViewMode === "grid"
+                            ? "bg-white/15 text-white"
+                            : "text-white/60 hover:text-white"
+                        }`}
+                      >
+                        ⊞ Grid
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        onClick={() => setProfilesViewMode("rows")}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`px-3 py-2 rounded-md text-sm font-semibold transition ${
+                          profilesViewMode === "rows"
+                            ? "bg-white/15 text-white"
+                            : "text-white/60 hover:text-white"
+                        }`}
+                      >
+                        ☰ Rows
+                      </motion.button>
+                    </div>
+
+                    {/* Create Button */}
+                    <motion.button
+                      type="button"
+                      onClick={() => {
+                        setProfileClientId("");
+                        setClientProfileDraft(createEmptyClientProfileDraft());
+                        setIsClientProfileOpen(true);
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="group relative h-12 rounded-xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 px-6 text-sm font-semibold text-white shadow-lg transition hover:border-white/30 hover:shadow-xl hover:shadow-white/10"
+                    >
+                      <span className="relative flex items-center gap-2">
+                        <span className="text-lg">+</span>
+                        New Profile
+                      </span>
+                    </motion.button>
+                  </div>
                 </div>
 
-                {/* Clients Grid */}
+                {/* Clients Grid or Rows */}
                 {clients.length === 0 ? (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -4682,7 +4716,7 @@ export default function OwnerPage() {
                     <Users className="mx-auto mb-3 text-white/30" size={40} weight="light" />
                     <p className="text-sm text-white/50">No client profiles yet. Create one to get started.</p>
                   </motion.div>
-                ) : (
+                ) : profilesViewMode === "grid" ? (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <AnimatePresence>
                       {clients.map((client, idx) => {
@@ -4782,6 +4816,63 @@ export default function OwnerPage() {
                               {/* Edit hint */}
                               <div className="pt-2 text-center">
                                 <p className="text-[10px] uppercase tracking-wider text-white/30 group-hover:text-white/50 transition">
+                                  Click to edit
+                                </p>
+                              </div>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <AnimatePresence>
+                      {clients.map((client, idx) => {
+                        const clientProjects = projects.filter((p) => p.client_id === client.id);
+                        const activeProjects = clientProjects.filter((p) => p.status !== "delivered");
+                        const isPortalActive = inferPortalEnabled(client);
+
+                        return (
+                          <motion.button
+                            key={client.id}
+                            type="button"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.2, delay: idx * 0.03 }}
+                            whileHover={{ x: 4 }}
+                            onClick={() => {
+                              setSelectedClientId(client.id);
+                              const firstProject = projects.find((project) => project.client_id === client.id)?.id ?? "";
+                              setSelectedProjectId(firstProject);
+                              persistOwnerSelection(client.id, firstProject);
+                              openClientProfile(client);
+                            }}
+                            className="group w-full rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-4 text-left transition hover:border-white/20 hover:bg-gradient-to-r hover:from-white/[0.08] hover:to-white/[0.03]"
+                          >
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <h3 className="text-sm font-semibold text-white group-hover:text-white transition">
+                                    {client.brand_name}
+                                  </h3>
+                                  {isPortalActive && (
+                                    <span className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-100">
+                                      Portal
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-white/60">
+                                  <span>{client.username || "No representative"}</span>
+                                  <span>•</span>
+                                  <span>{client.whatsapp_number || "No phone"}</span>
+                                  <span>•</span>
+                                  <span className="text-white/50">{clientProjects.length} projects {activeProjects.length > 0 && `(${activeProjects.length} active)`}</span>
+                                </div>
+                              </div>
+                              <div className="shrink-0">
+                                <p className="text-[10px] uppercase tracking-wider text-white/30 group-hover:text-white/50 transition text-right">
                                   Click to edit
                                 </p>
                               </div>
@@ -4907,7 +4998,7 @@ export default function OwnerPage() {
                 exit={{ scale: 0.96, opacity: 0, y: 20 }}
                 transition={{ type: "spring", damping: 24, stiffness: 280 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-gradient-to-b from-[#0d0d0d] to-black/50 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-[#0d0d0d] shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
               >
                 {/* Header - Sticky */}
                 <div className="sticky top-0 z-10 border-b border-white/10 bg-gradient-to-b from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm p-6">
@@ -5115,7 +5206,7 @@ export default function OwnerPage() {
                 exit={{ scale: 0.96, opacity: 0, y: 20 }}
                 transition={{ type: "spring", damping: 24, stiffness: 280 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-gradient-to-b from-[#0d0d0d] to-black/50 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-[#0d0d0d] shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
               >
                 {/* Header - Sticky */}
                 <div className="sticky top-0 z-10 border-b border-white/10 bg-gradient-to-b from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm p-6">
