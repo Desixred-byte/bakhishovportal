@@ -3012,7 +3012,13 @@ export default function OwnerPage() {
           )}
         </AnimatePresence>
 
-        <div className="mt-5 rounded-[28px] border border-white/8 bg-black/50 p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
+        <div
+          className={
+            showMobileInvoiceDetails
+              ? "mt-5 border-0 bg-transparent p-0 shadow-none lg:rounded-[28px] lg:border lg:border-white/8 lg:bg-black/50 lg:p-6 lg:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+              : "mt-5 rounded-[28px] border border-white/8 bg-black/50 p-6 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+          }
+        >
           <AnimatePresence mode="wait" initial={false}>
             {activeTab === "overview" && (
               <motion.div key="overview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
@@ -4641,39 +4647,58 @@ export default function OwnerPage() {
             )}
 
             {activeTab === "profiles" && (
-              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
-                <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                  <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                    <h3 className="text-lg font-semibold">{t.createClient}</h3>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <input value={newClientForm.brandName} onChange={(e) => setNewClientForm((p) => ({ ...p, brandName: e.target.value }))} placeholder="Company name" className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none" />
-                      <input value={newClientForm.username} onChange={(e) => setNewClientForm((p) => ({ ...p, username: e.target.value }))} placeholder="Representative name" className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none" />
-                      <input value={newClientForm.whatsapp} onChange={(e) => setNewClientForm((p) => ({ ...p, whatsapp: e.target.value }))} placeholder="WhatsApp" className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none" />
-                      <div className="sm:col-span-2 flex items-center gap-3 rounded-xl border border-white/12 bg-black/25 px-3 py-2">
-                        <button
-                          type="button"
-                          onClick={() => setNewClientForm((p) => ({ ...p, portalEnabled: !p.portalEnabled }))}
-                          className={`h-9 rounded-lg px-3 text-xs font-semibold transition ${newClientForm.portalEnabled ? "border border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border border-white/15 bg-white/5 text-white/70"}`}
-                        >
-                          {newClientForm.portalEnabled ? "Portal enabled" : "Portal disabled"}
-                        </button>
-                        <p className="text-xs text-white/50">Leave it disabled for legacy clients until you activate them.</p>
-                      </div>
-                      <input value={newClientForm.password} onChange={(e) => setNewClientForm((p) => ({ ...p, password: e.target.value }))} placeholder={newClientForm.portalEnabled ? "Password" : "Optional password"} className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none" />
-                    </div>
-                    <button type="button" onClick={handleCreateClient} className="mt-4 h-11 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold hover:bg-white/15">{t.createClient}</button>
-                  </section>
+              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-6">
+                {/* Header with Create Button */}
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-semibold tracking-tight text-white">Client Profiles</h2>
+                    <p className="mt-1 text-sm text-white/50">Manage all your client information and projects</p>
+                  </div>
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      setProfileClientId("");
+                      setClientProfileDraft(createEmptyClientProfileDraft());
+                      setIsClientProfileOpen(true);
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="group relative h-12 rounded-xl border border-white/20 bg-gradient-to-br from-white/10 to-white/5 px-6 text-sm font-semibold text-white shadow-lg transition hover:border-white/30 hover:shadow-xl hover:shadow-white/10"
+                  >
+                    <span className="relative flex items-center gap-2">
+                      <span className="text-lg">+</span>
+                      New Profile
+                    </span>
+                  </motion.button>
+                </div>
 
-                  <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                    <h3 className="text-lg font-semibold">Profiles</h3>
-                    <div className="mt-3 max-h-[320px] space-y-2 overflow-auto pr-1">
-                      {clients.length === 0 ? (
-                        <p className="text-sm text-white/45">No profiles yet.</p>
-                      ) : (
-                        clients.map((client) => (
-                          <button
+                {/* Clients Grid */}
+                {clients.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-12 text-center"
+                  >
+                    <Users className="mx-auto mb-3 text-white/30" size={40} weight="light" />
+                    <p className="text-sm text-white/50">No client profiles yet. Create one to get started.</p>
+                  </motion.div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <AnimatePresence>
+                      {clients.map((client, idx) => {
+                        const clientProjects = projects.filter((p) => p.client_id === client.id);
+                        const activeProjects = clientProjects.filter((p) => p.status !== "delivered");
+                        const isPortalActive = inferPortalEnabled(client);
+
+                        return (
+                          <motion.button
                             key={client.id}
                             type="button"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3, delay: idx * 0.05 }}
+                            whileHover={{ y: -4 }}
                             onClick={() => {
                               setSelectedClientId(client.id);
                               const firstProject = projects.find((project) => project.client_id === client.id)?.id ?? "";
@@ -4681,16 +4706,145 @@ export default function OwnerPage() {
                               persistOwnerSelection(client.id, firstProject);
                               openClientProfile(client);
                             }}
-                            className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left hover:border-white/20 hover:bg-white/[0.06]"
+                            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-5 text-left transition hover:border-white/20"
                           >
-                            <p className="text-sm font-semibold text-white">{client.brand_name}</p>
-                            <p className="mt-1 text-xs text-white/50">{inferPortalEnabled(client) ? "Portal active" : "Portal disabled"} · {client.username || "No username"}</p>
-                            <p className="mt-1 text-xs text-white/45">{client.whatsapp_number}</p>
-                          </button>
-                        ))
-                      )}
+                            {/* Background glow effect */}
+                            <div className="absolute inset-0 opacity-0 transition duration-500 group-hover:opacity-100">
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent" />
+                            </div>
+
+                            {/* Card content */}
+                            <div className="relative z-10 space-y-4">
+                              {/* Company name and portal status */}
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h3 className="text-base font-semibold leading-tight text-white group-hover:text-white transition">
+                                    {client.brand_name}
+                                  </h3>
+                                  {isPortalActive && (
+                                    <motion.div
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                      className="shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-100"
+                                    >
+                                      Portal
+                                    </motion.div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Representative info */}
+                              <div className="space-y-2 rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                                <p className="text-[11px] uppercase tracking-wider text-white/40">Representative</p>
+                                <p className="text-sm text-white/80">{client.username || "—"}</p>
+                                <p className="text-xs text-white/50 truncate">{client.whatsapp_number || "No phone"}</p>
+                              </div>
+
+                              {/* Projects info */}
+                              <div className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                                <Package size={16} className="text-white/40" weight="fill" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11px] uppercase tracking-wider text-white/40">Projects</p>
+                                  <div className="mt-1 flex items-center gap-1">
+                                    <span className="text-sm font-semibold text-white">{clientProjects.length}</span>
+                                    {activeProjects.length > 0 && (
+                                      <span className="text-xs text-white/50">
+                                        ({activeProjects.length} active)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Quick project list */}
+                              {clientProjects.length > 0 && (
+                                <div className="space-y-1 border-t border-white/8 pt-3">
+                                  <p className="text-[10px] uppercase tracking-wider text-white/40">Latest projects</p>
+                                  <div className="space-y-1">
+                                    {clientProjects.slice(0, 2).map((project) => (
+                                      <div
+                                        key={project.id}
+                                        className="flex items-center justify-between gap-2 rounded text-xs text-white/60 hover:text-white/80"
+                                      >
+                                        <span className="truncate">{project.name}</span>
+                                        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-white/50">
+                                          {project.service.slice(0, 3)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {clientProjects.length > 2 && (
+                                      <p className="text-[10px] text-white/40 pt-1">+{clientProjects.length - 2} more</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Edit hint */}
+                              <div className="pt-2 text-center">
+                                <p className="text-[10px] uppercase tracking-wider text-white/30 group-hover:text-white/50 transition">
+                                  Click to edit
+                                </p>
+                              </div>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+
+                {/* Create new form - Alternative modal trigger */}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Quick create</h3>
+                      <p className="mt-1 text-xs text-white/50">Add a new client quickly</p>
                     </div>
-                  </section>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      value={newClientForm.brandName}
+                      onChange={(e) => setNewClientForm((p) => ({ ...p, brandName: e.target.value }))}
+                      placeholder="Company name"
+                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
+                    />
+                    <input
+                      value={newClientForm.username}
+                      onChange={(e) => setNewClientForm((p) => ({ ...p, username: e.target.value }))}
+                      placeholder="Representative name"
+                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
+                    />
+                    <input
+                      value={newClientForm.whatsapp}
+                      onChange={(e) => setNewClientForm((p) => ({ ...p, whatsapp: e.target.value }))}
+                      placeholder="WhatsApp number"
+                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
+                    />
+                    <input
+                      value={newClientForm.password}
+                      onChange={(e) => setNewClientForm((p) => ({ ...p, password: e.target.value }))}
+                      placeholder="Password (optional)"
+                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30"
+                    />
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewClientForm((p) => ({ ...p, portalEnabled: !p.portalEnabled }))}
+                        className={`w-full h-11 rounded-xl text-sm font-semibold transition border ${newClientForm.portalEnabled ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"}`}
+                      >
+                        {newClientForm.portalEnabled ? "✓ Portal enabled" : "Portal disabled"}
+                      </button>
+                    </div>
+                  </div>
+                  <motion.button
+                    type="button"
+                    onClick={handleCreateClient}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="mt-4 w-full h-11 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition"
+                  >
+                    {t.createClient}
+                  </motion.button>
                 </div>
               </motion.div>
             )}
@@ -4740,7 +4894,7 @@ export default function OwnerPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/65"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-6"
               onClick={() => {
                 setIsClientProfileOpen(false);
                 setIsClientProjectsModalOpen(false);
@@ -4748,143 +4902,200 @@ export default function OwnerPage() {
               }}
             >
               <motion.div
-                initial={{ scale: 0.96, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.96, opacity: 0 }}
+                initial={{ scale: 0.96, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.96, opacity: 0, y: 20 }}
                 transition={{ type: "spring", damping: 24, stiffness: 280 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-xl rounded-[28px] border border-white/15 bg-[#0d0d0d] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-gradient-to-b from-[#0d0d0d] to-black/50 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
               >
-                <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client profile</p>
-                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">{clientProfileDraft.companyName || "Edit client info"}</h3>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Company name*</label>
-                    <input
-                      value={clientProfileDraft.companyName}
-                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, companyName: e.target.value }))}
-                      className="mt-2 h-11 w-full rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Representative name*</label>
-                    <input
-                      value={clientProfileDraft.representativeName}
-                      onChange={(e) => {
-                        const nextName = e.target.value;
-                        setClientProfileDraft((prev) => ({
-                          ...prev,
-                          representativeName: nextName,
-                          portalUsername:
-                            !prev.portalUsername || prev.portalUsername === prev.representativeName
-                              ? nextName
-                              : prev.portalUsername,
-                        }));
-                      }}
-                      className="mt-2 h-11 w-full rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">WhatsApp number*</label>
-                    <input
-                      value={clientProfileDraft.whatsappNumber}
-                      onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
-                      className="mt-2 h-11 w-full rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Header - Sticky */}
+                <div className="sticky top-0 z-10 border-b border-white/10 bg-gradient-to-b from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm p-6">
+                  <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.14em] text-white/45">Portal access</p>
-                      <p className="mt-1 text-sm text-white/60">{clientProfileDraft.portalEnabled ? "Enabled and ready for login." : "Disabled until you activate it."}</p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client Profile</p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                        {clientProfileDraft.companyName || "New client"}
+                      </h2>
                     </div>
                     <button
                       type="button"
-                      onClick={handleTogglePortalAccess}
-                      className={`h-10 rounded-xl px-4 text-sm font-semibold transition ${clientProfileDraft.portalEnabled ? "border border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"}`}
+                      onClick={() => {
+                        setIsClientProfileOpen(false);
+                        setProfileClientId("");
+                      }}
+                      className="mt-1 text-white/50 hover:text-white transition"
                     >
-                      {clientProfileDraft.portalEnabled ? "Deactivate portal" : "Activate portal"}
+                      <X size={24} weight="bold" />
                     </button>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal username</label>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          value={clientProfileDraft.portalUsername}
-                          onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalUsername: e.target.value }))}
-                          placeholder="Generated on activation"
-                          className="h-11 flex-1 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalUsername: createPortalUsername(prev.companyName, prev.representativeName) }))}
-                          className="h-11 rounded-xl border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white/80 hover:bg-white/10"
-                        >
-                          Generate
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal password</label>
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          value={clientProfileDraft.portalPassword}
-                          onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalPassword: e.target.value }))}
-                          placeholder="Generated on activation"
-                          className="h-11 flex-1 rounded-xl border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalPassword: createPortalPassword() }))}
-                          className="h-11 rounded-xl border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white/80 hover:bg-white/10"
-                        >
-                          Generate
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.14em] text-white/45">Projects</p>
-                      <p className="mt-1 text-sm text-white/60">Manage this client's saved projects in a separate popup.</p>
+                {/* Content - Scrollable */}
+                <div className="space-y-5 p-6">
+                  {/* Basic Information */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Basic Information</h3>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                      <div>
+                        <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Company name*</label>
+                        <input
+                          value={clientProfileDraft.companyName}
+                          onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, companyName: e.target.value }))}
+                          className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                        />
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Representative name*</label>
+                          <input
+                            value={clientProfileDraft.representativeName}
+                            onChange={(e) => {
+                              const nextName = e.target.value;
+                              setClientProfileDraft((prev) => ({
+                                ...prev,
+                                representativeName: nextName,
+                                portalUsername:
+                                  !prev.portalUsername || prev.portalUsername === prev.representativeName
+                                    ? nextName
+                                    : prev.portalUsername,
+                              }));
+                            }}
+                            className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">WhatsApp number*</label>
+                          <input
+                            value={clientProfileDraft.whatsappNumber}
+                            onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
+                            className="mt-2 h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <button
+                  </div>
+
+                  {/* Portal Access */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Portal Access</h3>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.14em] text-white/45">Status</p>
+                          <p className="mt-1 text-sm text-white/70">
+                            {clientProfileDraft.portalEnabled ? "✓ Enabled and ready for login" : "○ Disabled"}
+                          </p>
+                        </div>
+                        <motion.button
+                          type="button"
+                          onClick={handleTogglePortalAccess}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className={`h-10 rounded-lg px-4 text-sm font-semibold transition ${clientProfileDraft.portalEnabled ? "border border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"}`}
+                        >
+                          {clientProfileDraft.portalEnabled ? "Deactivate" : "Activate"}
+                        </motion.button>
+                      </div>
+
+                      <AnimatePresence>
+                        {clientProfileDraft.portalEnabled && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="space-y-3 border-t border-white/10 pt-4"
+                          >
+                            <div>
+                              <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal username</label>
+                              <div className="mt-2 flex gap-2">
+                                <input
+                                  value={clientProfileDraft.portalUsername}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalUsername: e.target.value }))}
+                                  placeholder="Generated on activation"
+                                  className="h-11 flex-1 rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                                />
+                                <motion.button
+                                  type="button"
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalUsername: createPortalUsername(prev.companyName, prev.representativeName) }))}
+                                  className="h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white/80 hover:bg-white/10 transition"
+                                >
+                                  Generate
+                                </motion.button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[11px] uppercase tracking-[0.14em] text-white/45">Portal password</label>
+                              <div className="mt-2 flex gap-2">
+                                <input
+                                  value={clientProfileDraft.portalPassword}
+                                  onChange={(e) => setClientProfileDraft((prev) => ({ ...prev, portalPassword: e.target.value }))}
+                                  placeholder="Generated on activation"
+                                  className="h-11 flex-1 rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                                />
+                                <motion.button
+                                  type="button"
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setClientProfileDraft((prev) => ({ ...prev, portalPassword: createPortalPassword() }))}
+                                  className="h-11 rounded-lg border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white/80 hover:bg-white/10 transition"
+                                >
+                                  Generate
+                                </motion.button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* Projects Management */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Projects & Details</h3>
+                        <p className="mt-1 text-xs text-white/50">Manage and view all associated projects</p>
+                      </div>
+                    </div>
+                    <motion.button
                       type="button"
                       onClick={() => setIsClientProjectsModalOpen(true)}
-                      className="h-10 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full h-11 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition flex items-center justify-center gap-2"
                     >
-                      Manage projects
-                    </button>
+                      <Package size={16} />
+                      Manage Projects & Details
+                    </motion.button>
                   </div>
                 </div>
 
-                <div className="mt-6 flex gap-3">
-                  <button
+                {/* Footer - Sticky */}
+                <div className="sticky bottom-0 border-t border-white/10 bg-gradient-to-t from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm flex gap-3 p-6">
+                  <motion.button
                     type="button"
                     onClick={() => {
                       setIsClientProfileOpen(false);
                       setIsClientProjectsModalOpen(false);
                       setProfileClientId("");
                     }}
-                    className="h-11 flex-1 rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/80 hover:bg-white/10"
+                    whileTap={{ scale: 0.98 }}
+                    className="h-11 flex-1 rounded-lg border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/80 hover:bg-white/10 transition"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </motion.button>
+                  <motion.button
                     type="button"
                     onClick={handleSaveClientProfile}
-                    className="h-11 flex-1 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="h-11 flex-1 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition"
                   >
-                    Save profile
-                  </button>
+                    Save Profile
+                  </motion.button>
                 </div>
               </motion.div>
             </motion.div>
@@ -4895,94 +5106,204 @@ export default function OwnerPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/65"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-6"
               onClick={() => setIsClientProjectsModalOpen(false)}
             >
               <motion.div
-                initial={{ scale: 0.96, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.96, opacity: 0 }}
+                initial={{ scale: 0.96, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.96, opacity: 0, y: 20 }}
                 transition={{ type: "spring", damping: 24, stiffness: 280 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-2xl rounded-[28px] border border-white/15 bg-[#0d0d0d] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
+                className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-white/15 bg-gradient-to-b from-[#0d0d0d] to-black/50 shadow-[0_30px_80px_rgba(0,0,0,0.55)]"
               >
-                <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Client projects</p>
-                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-                  {clientProfileDraft.companyName || "Projects"}
-                </h3>
-
-                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-white/45">Saved projects</p>
-                  <div className="mt-3 max-h-[320px] space-y-2 overflow-auto pr-1">
-                    {profileProjects.length > 0 ? (
-                      profileProjects.map((project) => (
-                        <div
-                          key={project.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">{project.name}</p>
-                            <p className="mt-1 truncate text-xs text-white/45">
-                              {project.service.toUpperCase()}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setConfirmDialog({
-                                isOpen: true,
-                                message: `Delete project ${project.name}?`,
-                                onConfirm: () => handleDeleteProject(project.id),
-                              });
-                            }}
-                            className="shrink-0 rounded-lg border border-red-300/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-500/25"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="rounded-xl border border-dashed border-white/10 px-3 py-2.5 text-sm text-white/45">
-                        No projects for this client yet.
+                {/* Header - Sticky */}
+                <div className="sticky top-0 z-10 border-b border-white/10 bg-gradient-to-b from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Projects & Details</p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                        {clientProfileDraft.companyName || "Projects"}
+                      </h2>
+                      <p className="mt-1 text-xs text-white/50">
+                        {profileProjects.length} project{profileProjects.length !== 1 ? "s" : ""} in total
                       </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsClientProjectsModalOpen(false)}
+                      className="mt-1 text-white/50 hover:text-white transition"
+                    >
+                      <X size={24} weight="bold" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content - Scrollable */}
+                <div className="space-y-6 p-6">
+                  {/* Existing Projects */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Existing Projects</h3>
+                      {profileProjects.length > 0 && (
+                        <span className="text-xs bg-white/10 px-2.5 py-1 rounded-full text-white/60">
+                          {profileProjects.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {profileProjects.length > 0 ? (
+                      <div className="grid gap-3">
+                        <AnimatePresence>
+                          {profileProjects.map((project, idx) => (
+                            <motion.div
+                              key={project.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -20 }}
+                              transition={{ delay: idx * 0.05 }}
+                              className="group rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.05] to-white/[0.02] p-4 hover:border-white/20 transition"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm font-semibold text-white truncate">{project.name}</h4>
+                                    <span className="inline-block rounded-full bg-white/10 px-2.5 py-1 text-[10px] uppercase tracking-wider text-white/60">
+                                      {project.service}
+                                    </span>
+                                    <span className={`inline-block rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wider font-semibold ${
+                                      project.status === "delivered" ? "bg-emerald-400/20 text-emerald-200" :
+                                      project.status === "review" ? "bg-yellow-400/20 text-yellow-200" :
+                                      project.status === "in_progress" ? "bg-blue-400/20 text-blue-200" :
+                                      "bg-white/10 text-white/60"
+                                    }`}>
+                                      {projectStatusLabels[language][project.status]}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="mt-3 grid gap-2 text-xs text-white/60">
+                                    {project.progress > 0 && (
+                                      <div className="flex items-center gap-2">
+                                        <span>Progress:</span>
+                                        <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                          <div
+                                            className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-500"
+                                            style={{ width: `${project.progress}%` }}
+                                          />
+                                        </div>
+                                        <span className="font-semibold">{project.progress}%</span>
+                                      </div>
+                                    )}
+                                    {project.start_date && (
+                                      <div className="flex items-center gap-2">
+                                        <CalendarDots size={12} />
+                                        <span>Started: {new Date(project.start_date).toLocaleDateString()}</span>
+                                      </div>
+                                    )}
+                                    {project.delivery_date && (
+                                      <div className="flex items-center gap-2">
+                                        <FileText size={12} />
+                                        <span>Delivery: {new Date(project.delivery_date).toLocaleDateString()}</span>
+                                      </div>
+                                    )}
+                                    {project.latest_update && (
+                                      <div className="text-[10px] text-white/40">
+                                        Last updated: {new Date(project.latest_update).toLocaleDateString()}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <motion.button
+                                  type="button"
+                                  onClick={() => {
+                                    setConfirmDialog({
+                                      isOpen: true,
+                                      message: `Delete project "${project.name}"?`,
+                                      onConfirm: () => handleDeleteProject(project.id),
+                                    });
+                                  }}
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  className="shrink-0 rounded-lg border border-red-300/30 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-100 hover:bg-red-500/25 transition"
+                                >
+                                  Delete
+                                </motion.button>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center"
+                      >
+                        <Package className="mx-auto mb-2 text-white/30" size={32} weight="light" />
+                        <p className="text-sm text-white/45">No projects yet. Create one to get started.</p>
+                      </motion.div>
                     )}
                   </div>
-                </div>
 
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-xs uppercase tracking-[0.14em] text-white/45">Add project</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <input
-                      value={newProjectForm.name}
-                      onChange={(e) => setNewProjectForm((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="Project name"
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none"
-                    />
-                    <select
-                      value={newProjectForm.service}
-                      onChange={(e) => setNewProjectForm((p) => ({ ...p, service: e.target.value as ServiceType }))}
-                      className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none"
-                    >
-                      {serviceOptions.map((service) => <option key={service} value={service}>{service.toUpperCase()}</option>)}
-                    </select>
+                  {/* Add New Project */}
+                  <div className="space-y-3 border-t border-white/10 pt-6">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-white">Add New Project</h3>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                      <input
+                        value={newProjectForm.name}
+                        onChange={(e) => setNewProjectForm((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="Project name"
+                        className="h-11 w-full rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white placeholder-white/40 outline-none hover:border-white/20 focus:border-white/30 transition"
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <select
+                          value={newProjectForm.service}
+                          onChange={(e) => setNewProjectForm((p) => ({ ...p, service: e.target.value as ServiceType }))}
+                          className="h-11 rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                        >
+                          {serviceOptions.map((service) => (
+                            <option key={service} value={service}>
+                              {service.toUpperCase()}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={newProjectForm.status}
+                          onChange={(e) => setNewProjectForm((p) => ({ ...p, status: e.target.value as ProjectStatus }))}
+                          className="h-11 rounded-lg border border-white/12 bg-black/40 px-3 text-sm text-white outline-none hover:border-white/20 focus:border-white/30 transition"
+                        >
+                          {projectStatusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {projectStatusLabels[language][status]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <motion.button
+                        type="button"
+                        onClick={handleCreateProject}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full h-11 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15 transition flex items-center justify-center gap-2"
+                      >
+                        <span>+</span>
+                        Add project
+                      </motion.button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCreateProject}
-                    className="mt-3 h-10 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15"
-                  >
-                    Add project
-                  </button>
                 </div>
 
-                <div className="mt-6">
-                  <button
+                {/* Footer - Sticky */}
+                <div className="sticky bottom-0 border-t border-white/10 bg-gradient-to-t from-[#0d0d0d] to-[#0d0d0d]/80 backdrop-blur-sm p-6">
+                  <motion.button
                     type="button"
                     onClick={() => setIsClientProjectsModalOpen(false)}
-                    className="h-11 w-full rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/80 hover:bg-white/10"
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full h-11 rounded-lg border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/80 hover:bg-white/10 transition"
                   >
                     Close
-                  </button>
+                  </motion.button>
                 </div>
               </motion.div>
             </motion.div>
