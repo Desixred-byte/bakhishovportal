@@ -13,23 +13,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://bakhishovportal.vercel.app"),
+  metadataBase: new URL("https://app.bakhishov.com"),
   title: {
-    default: "Muwafaq Solutions Client Portal",
-    template: "%s · Muwafaq Solutions",
+    default: "Bakhishov Brands Portal",
+    template: "%s · Bakhishov Brands",
   },
-  description: "Private client portal for Muwafaq Solutions — project progress, invoices, deliverables, and support in one place.",
+  description: "Bakhishov Brands client portal for project progress, invoices, deliverables, and support in one secure workspace.",
   openGraph: {
-    title: "Muwafaq Solutions Client Portal",
-    description: "Track delivered projects, invoices, and client updates in a premium portal experience.",
-    url: "https://bakhishovportal.vercel.app",
-    siteName: "Muwafaq Solutions Portal",
+    title: "Bakhishov Brands Portal",
+    description: "Track project progress, invoices, deliverables, and updates in one premium portal experience.",
+    url: "https://app.bakhishov.com",
+    siteName: "Bakhishov Brands",
     images: [
       {
         url: "/webthumb.png",
         width: 1200,
         height: 630,
-        alt: "Muwafaq Solutions Client Portal",
+        alt: "Bakhishov Brands Portal",
       },
     ],
     locale: "en_US",
@@ -37,8 +37,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Muwafaq Solutions Client Portal",
-    description: "Track delivered projects, invoices, and client updates in one premium workspace.",
+    title: "Bakhishov Brands Portal",
+    description: "Track project progress, invoices, deliverables, and updates in one premium workspace.",
     images: ["/webthumb.png"],
   },
 };
