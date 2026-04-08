@@ -814,6 +814,7 @@ export default function InvoicesPage() {
     );
     const balanceDue = Math.max(totalAfterDiscount - paidAmount, 0);
     const billToName = toPdfSafeText(meta?.customerName || meta?.companyName || effectiveProjectLabel);
+    const billToCompany = toPdfSafeText(meta?.companyName || "");
     const billToEmail = toPdfSafeText(meta?.customerEmail || "");
     const billToAddress = toPdfSafeText(meta?.customerAddress || meta?.companyName || "Bakhishov Brands");
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -902,18 +903,20 @@ export default function InvoicesPage() {
     
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(...bodyText);
-    doc.setFontSize(10.5);
-    doc.text(billToName, leftCardX + 14, infoY + 35);
+    doc.setFontSize(10);
+    doc.text(billToName, leftCardX + 14, infoY + 32);
     
     doc.setFont(pdfFont, "normal");
     doc.setTextColor(130, 130, 130);
     doc.setFontSize(8.5);
-    doc.text(billToAddress, leftCardX + 14, infoY + 48);
-    
-    doc.setFont(pdfFont, "normal");
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(8);
-    if (billToEmail) doc.text(billToEmail, leftCardX + 14, infoY + 60);
+    if (billToCompany && billToCompany !== billToName) {
+      doc.text(billToCompany, leftCardX + 14, infoY + 43);
+    }
+    if (billToEmail) {
+      doc.text(billToEmail, leftCardX + 14, infoY + 53);
+    } else if (billToCompany && billToCompany !== billToName) {
+      doc.text(billToAddress, leftCardX + 14, infoY + 53);
+    }
 
     // Right card: Project info header and details
     doc.setFont(pdfFont, "bold");
