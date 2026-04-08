@@ -869,12 +869,12 @@ export default function InvoicesPage() {
     doc.text("sales@bakhishov.com", margin + 26, margin + 148);
 
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(pageWidth - margin - 136, margin + 28, 106, 32, 13, 13, "F");
+    doc.roundedRect(pageWidth - margin - 152, margin + 28, 122, 28, 13, 13, "F");
     doc.setTextColor(...lineStrong);
     doc.setFont(pdfFont, "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     const statusText = getPdfDisplayStatus(invoice.status).toUpperCase();
-    doc.text(statusText, pageWidth - margin - 122, margin + 47, { align: "center", maxWidth: 90 });
+    doc.text(statusText, pageWidth - margin - 91, margin + 45, { align: "center" });
 
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(255, 255, 255);
