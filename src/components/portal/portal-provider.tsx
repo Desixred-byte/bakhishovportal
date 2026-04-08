@@ -32,16 +32,28 @@ export function PortalProvider({ children }: { children: ReactNode }) {
       }
 
       // Load client
-      const { data: clientRow } = await supabase
+      const { data: clientRow, error: clientErr } = await supabase
         .from("clients")
         .select("*")
         .eq("id", clientId)
         .single();
 
+      if (clientErr) {
+        // Keep existing local session on transient errors (network/deploy refresh).
+        setLoading(false);
+        return;
+      }
+
+      if (!clientRow) {
+        localStorage.removeItem("client_id");
+        setLoading(false);
+        return;
+      }
+
       const savedPassword = typeof clientRow?.password === "string" ? clientRow.password : "";
       const portalIsDisabled = savedPassword.length === 0 || savedPassword.startsWith("DISABLED::") || ("portal_enabled" in clientRow && clientRow.portal_enabled === false);
 
-      if (!clientRow || portalIsDisabled) {
+      if (portalIsDisabled) {
         localStorage.removeItem("client_id");
         setLoading(false);
         return;

@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LockKey, ShieldCheck, User } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +15,13 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [portalUnavailable, setPortalUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const clientId = localStorage.getItem("client_id");
+    if (clientId) {
+      router.replace("/portal");
+    }
+  }, [router]);
 
   async function handleLogin() {
     setLoading(true);
@@ -105,7 +112,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-12 w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition-all duration-300 focus:border-white/35 focus:bg-white/[0.07]"
+                className="h-12 w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-4 text-base text-white outline-none placeholder:text-white/20 transition-all duration-300 focus:border-white/35 focus:bg-white/[0.07] sm:text-sm"
                 placeholder="your username"
               />
             </div>
@@ -120,7 +127,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className="h-12 w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition-all duration-300 focus:border-white/35 focus:bg-white/[0.07]"
+                className="h-12 w-full rounded-2xl border border-white/15 bg-white/[0.04] pl-11 pr-4 text-base text-white outline-none placeholder:text-white/20 transition-all duration-300 focus:border-white/35 focus:bg-white/[0.07] sm:text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -145,18 +152,11 @@ export default function LoginPage() {
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/15 disabled:opacity-50"
+            className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 text-base font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/15 disabled:opacity-50 sm:text-sm"
           >
             {loading ? "Verifying..." : "Enter Portal"}
             {!loading && <ArrowRight className="h-4 w-4" weight="bold" />}
           </button>
-
-          <Link
-            href="/owner/login"
-            className="inline-flex h-11 w-full items-center justify-center rounded-2xl border border-white/15 bg-black/35 text-sm font-medium text-white/80 transition hover:border-white/25 hover:bg-white/10 hover:text-white"
-          >
-            Open Owner Console
-          </Link>
         </div>
       </div>
     </div>
