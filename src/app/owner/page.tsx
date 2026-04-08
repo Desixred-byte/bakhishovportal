@@ -3,12 +3,12 @@
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDots, CaretDown, ChartBar, DotsThreeOutline, FileText, GearSix, House, Package, SpeakerHigh, Users } from "@phosphor-icons/react";
+import { CalendarDots, CaretDown, ChartBar, DotsThreeOutline, FileText, GearSix, House, Package, ShieldCheck, SpeakerHigh, Users } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import type { ProjectStatus, ServiceType } from "@/lib/types";
 
 type OwnerLanguage = "en" | "ru" | "az";
-type OwnerTab = "overview" | "status" | "invoices" | "materials" | "smm" | "profiles" | "labels" | "setup";
+type OwnerTab = "overview" | "status" | "invoices" | "materials" | "smm" | "profiles" | "labels" | "security" | "setup";
 
 type SmmDraft = {
   cadence: string;
@@ -161,10 +161,22 @@ type DeliverableRow = {
   url: string;
 };
 
+type SessionRow = {
+  id: string;
+  client_id: string | null;
+  customer_name: string | null;
+  company_name: string | null;
+  device_label: string | null;
+  location_label: string | null;
+  user_agent: string | null;
+  last_seen_at: string | null;
+  created_at: string | null;
+};
+
 const serviceOptions: ServiceType[] = ["website", "smm", "software", "app", "branding"];
 const projectStatusOptions: ProjectStatus[] = ["planning", "in_progress", "review", "delivered"];
 const invoiceStatusOptions = ["unpaid", "partial", "paid"] as const;
-const tabs: OwnerTab[] = ["overview", "status", "invoices", "materials", "smm", "profiles", "setup"];
+const tabs: OwnerTab[] = ["overview", "status", "invoices", "materials", "smm", "profiles", "security", "setup"];
 
 const copy: Record<OwnerLanguage, Record<string, string>> = {
   en: {
@@ -186,6 +198,7 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     invoices: "Invoices",
     materials: "Materials",
     smm: "SMM",
+    security: "Security",
     setup: "Setup",
     saveChanges: "Save changes",
     addInvoice: "Add invoice",
@@ -223,6 +236,7 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     invoices: "Счета",
     materials: "Материалы",
     smm: "SMM",
+    security: "Безопасность",
     setup: "Настройка",
     saveChanges: "Сохранить",
     addInvoice: "Добавить счет",
@@ -260,6 +274,7 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     invoices: "Fakturalar",
     materials: "Materiallar",
     smm: "SMM",
+    security: "Təhlükəsizlik",
     setup: "Quraşdırma",
     saveChanges: "Yadda saxla",
     addInvoice: "Faktura əlavə et",
@@ -299,6 +314,7 @@ const ownerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
   { key: "materials", icon: Package },
   { key: "smm", icon: SpeakerHigh },
   { key: "profiles", icon: Users },
+  { key: "security", icon: ShieldCheck },
   { key: "setup", icon: GearSix },
 ];
 
@@ -307,6 +323,7 @@ const generalOwnerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
   { key: "invoices", icon: FileText },
   { key: "labels", icon: Package },
   { key: "profiles", icon: Users },
+  { key: "security", icon: ShieldCheck },
   { key: "setup", icon: GearSix },
 ];
 
@@ -923,6 +940,8 @@ export default function OwnerPage() {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectInvoices, setProjectInvoices] = useState<InvoiceRow[]>([]);
   const [projectDeliverables, setProjectDeliverables] = useState<DeliverableRow[]>([]);
+  const [securitySessions, setSecuritySessions] = useState<SessionRow[]>([]);
+  const [securityLoading, setSecurityLoading] = useState(false);
   const [allInvoiceCount, setAllInvoiceCount] = useState(0);
 
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -1033,6 +1052,26 @@ export default function OwnerPage() {
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId]
   );
+
+  const onlineThresholdMs = 2 * 60 * 1000;
+  const decoratedSessions = useMemo(() => {
+    const now = Date.now();
+    const clientMap = new Map(clients.map((item) => [item.id, item]));
+
+    return securitySessions.map((session) => {
+      const linkedClient = session.client_id ? clientMap.get(session.client_id) : undefined;
+      const customerName = session.customer_name || linkedClient?.username || "Unknown customer";
+      const companyName = session.company_name || linkedClient?.brand_name || "Unknown company";
+      const lastSeenMs = session.last_seen_at ? new Date(session.last_seen_at).getTime() : 0;
+
+      return {
+        ...session,
+        customerName,
+        companyName,
+        isOnline: lastSeenMs > 0 && now - lastSeenMs <= onlineThresholdMs,
+      };
+    });
+  }, [clients, securitySessions]);
 
   const activeProfileClientId = profileClientId || selectedClientId;
   const profileProjects = useMemo(
@@ -1240,6 +1279,30 @@ export default function OwnerPage() {
     setProjectDeliverables((deliverableRows ?? []) as DeliverableRow[]);
   }
 
+  async function loadSecuritySessions(clientId = selectedClientId) {
+    setSecurityLoading(true);
+
+    let query = supabase
+      .from("portal_sessions")
+      .select("id, client_id, customer_name, company_name, device_label, location_label, user_agent, last_seen_at, created_at")
+      .order("last_seen_at", { ascending: false })
+      .limit(200);
+
+    if (clientId) {
+      query = query.eq("client_id", clientId);
+    }
+
+    const { data, error: sessionsErr } = await query;
+    if (sessionsErr) {
+      setSecuritySessions([]);
+      setSecurityLoading(false);
+      return;
+    }
+
+    setSecuritySessions((data ?? []) as SessionRow[]);
+    setSecurityLoading(false);
+  }
+
   async function loadLists(preferredClientId?: string, preferredProjectId?: string) {
     setLoading(true);
     setError(null);
@@ -1294,6 +1357,7 @@ export default function OwnerPage() {
     setSelectedClientId(nextClientId);
     setSelectedProjectId(nextProjectId);
     persistOwnerSelection(nextClientId, nextProjectId);
+    await loadSecuritySessions(nextClientId);
     setLoading(false);
   }
 
@@ -1314,6 +1378,11 @@ export default function OwnerPage() {
   useEffect(() => {
     persistOwnerSelection(selectedClientId, selectedProjectId);
   }, [selectedClientId, selectedProjectId]);
+
+  useEffect(() => {
+    void loadSecuritySessions(selectedClientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClientId]);
 
   useEffect(() => {
     if (!selectedClientId) return;
@@ -3774,6 +3843,87 @@ export default function OwnerPage() {
                       </AnimatePresence>
                     )}
                   </div>
+                </section>
+              </motion.div>
+            )}
+
+            {activeTab === "security" && (
+              <motion.div key="security" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Total sessions</p>
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-white">{decoratedSessions.length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-400/25 bg-emerald-400/10 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-emerald-100/80">Online now</p>
+                    <p className="mt-2 text-3xl font-semibold tracking-tight text-emerald-100">{decoratedSessions.filter((session) => session.isOnline).length}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-white/45">Selected scope</p>
+                    <p className="mt-2 truncate text-lg font-semibold text-white">{selectedClient?.brand_name || "All customers"}</p>
+                  </div>
+                </div>
+
+                <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Client session security</h3>
+                      <p className="mt-1 text-sm text-white/55">Live session activity with device and location tracking.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void loadSecuritySessions(selectedClientId)}
+                      disabled={securityLoading}
+                      className="h-10 rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+                    >
+                      {securityLoading ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  {securityLoading ? (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-white/60">Loading sessions...</div>
+                  ) : decoratedSessions.length === 0 ? (
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-white/60">No tracked sessions yet. Client activity will appear here after login.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {decoratedSessions.map((session) => {
+                        const initials = session.customerName
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0])
+                          .join("")
+                          .toUpperCase();
+
+                        return (
+                          <div key={session.id} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/40 text-xs font-semibold text-white/85">
+                                  {initials || "--"}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-white">{session.customerName}</p>
+                                  <p className="truncate text-xs text-white/55">{session.companyName}</p>
+                                </div>
+                              </div>
+
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${session.isOnline ? "border-emerald-300/30 bg-emerald-400/15 text-emerald-100" : "border-zinc-300/20 bg-zinc-400/10 text-zinc-200"}`}>
+                                <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${session.isOnline ? "bg-emerald-300" : "bg-zinc-300/70"}`} />
+                                {session.isOnline ? "Online" : "Offline"}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 grid gap-2 text-xs text-white/65 sm:grid-cols-3">
+                              <p className="truncate"><span className="text-white/40">Device:</span> {session.device_label || "Unknown"}</p>
+                              <p className="truncate"><span className="text-white/40">Location:</span> {session.location_label || "Unknown"}</p>
+                              <p className="truncate"><span className="text-white/40">Last seen:</span> {session.last_seen_at ? new Date(session.last_seen_at).toLocaleString() : "—"}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
               </motion.div>
             )}

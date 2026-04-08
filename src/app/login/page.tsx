@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, LockKey, ShieldCheck, User } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { reportPortalSessionActivity } from "@/lib/portal-session";
 import { useEffect } from "react";
 
 export default function LoginPage() {
@@ -55,6 +56,12 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+
+    await reportPortalSessionActivity({
+      clientId: data.id,
+      customerName: data.username,
+      companyName: data.brand_name,
+    });
 
     localStorage.setItem("client_id", data.id);
     router.push("/portal");

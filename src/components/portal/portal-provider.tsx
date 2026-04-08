@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Project, Invoice, Deliverable } from "@/lib/types";
+import { reportPortalSessionActivity } from "@/lib/portal-session";
 
 type PortalContextValue = {
   client: Client | null;
@@ -157,6 +158,22 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     if (!clientId || !selectedProjectId) return;
     localStorage.setItem(getSelectedProjectStorageKey(clientId), selectedProjectId);
   }, [client?.id, selectedProjectId]);
+
+  useEffect(() => {
+    if (!client?.id) return;
+
+    const sendHeartbeat = () => {
+      void reportPortalSessionActivity({
+        clientId: client.id,
+        customerName: client.username,
+        companyName: client.brandName,
+      });
+    };
+
+    sendHeartbeat();
+    const intervalId = window.setInterval(sendHeartbeat, 45000);
+    return () => window.clearInterval(intervalId);
+  }, [client?.id, client?.username, client?.brandName]);
 
   const value = useMemo(
     () => ({ client, selectedProject, selectedProjectId, setSelectedProjectId, loading }),
