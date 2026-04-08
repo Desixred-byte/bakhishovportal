@@ -1,9 +1,9 @@
 "use client";
 
 import { AnimatePresence, animate, motion, useMotionValue, useTransform } from "framer-motion";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDots, CaretDown, ChartBar, DotsThreeOutline, FileText, GearSix, House, Package, ShieldCheck, SpeakerHigh, Users } from "@phosphor-icons/react";
+import { CalendarDots, CaretDown, ChartBar, Check, DotsThreeOutline, FileText, FunnelSimple, GearSix, House, MagnifyingGlass, Package, ShieldCheck, SlidersHorizontal, SpeakerHigh, Users, X } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import type { ProjectStatus, ServiceType } from "@/lib/types";
 
@@ -711,6 +711,107 @@ type PickerOption = {
   description?: string;
 };
 
+type FilterChoice = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+function FilterModal({
+  open,
+  title,
+  subtitle,
+  icon: Icon,
+  selectedValue,
+  options,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  title: string;
+  subtitle: string;
+  icon: typeof FunnelSimple;
+  selectedValue: string;
+  options: FilterChoice[];
+  onClose: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/65 px-3 py-4 sm:items-center sm:px-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 18, scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-lg overflow-hidden rounded-[30px] border border-white/12 bg-[#0d0d0d] shadow-[0_30px_90px_rgba(0,0,0,0.7)]"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white">
+                  <Icon className="h-5 w-5" weight="bold" />
+                </span>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-white/40">Invoice filter</p>
+                  <h3 className="mt-1 text-lg font-semibold text-white">{title}</h3>
+                  <p className="mt-1 text-sm text-white/55">{subtitle}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                aria-label="Close filter"
+              >
+                <X className="h-4 w-4" weight="bold" />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto p-3">
+              <div className="grid gap-2">
+                {options.map((option) => {
+                  const active = option.value === selectedValue;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        onSelect(option.value);
+                        onClose();
+                      }}
+                      className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 text-left transition-all duration-200 ${
+                        active
+                          ? "border-white/25 bg-white/[0.1] text-white shadow-[0_12px_35px_rgba(255,255,255,0.06)]"
+                          : "border-white/10 bg-white/[0.03] text-white/75 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold">{option.label}</span>
+                          {active && <Check className="h-4 w-4 text-emerald-300" weight="bold" />}
+                        </div>
+                        {option.description && <p className="mt-1 truncate text-xs text-white/45">{option.description}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function SearchablePicker({
   title,
   value,
@@ -970,6 +1071,17 @@ export default function OwnerPage() {
   const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft>(createEmptyInvoiceDraft());
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [invoiceMetaMap, setInvoiceMetaMap] = useState<Record<string, InvoiceMeta>>({});
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<"all" | InvoiceRow["status"]>("all");
+  const [invoiceServiceFilter, setInvoiceServiceFilter] = useState<"all" | ServiceType>("all");
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePageSize, setInvoicePageSize] = useState(10);
+  const [invoiceFilterModal, setInvoiceFilterModal] = useState<"status" | "service" | "pageSize" | null>(null);
+  const [isMobileInvoiceViewport, setIsMobileInvoiceViewport] = useState(false);
+  const mobileInvoiceScrollYRef = useRef<number | null>(null);
+  const deferredInvoiceSearchQuery = useDeferredValue(invoiceSearchQuery);
+  const deferredInvoiceStatusFilter = useDeferredValue(invoiceStatusFilter);
+  const deferredInvoiceServiceFilter = useDeferredValue(invoiceServiceFilter);
   const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
   const [isInvoiceEditMode, setIsInvoiceEditMode] = useState(false);
   const [isInvoiceActionsOpen, setIsInvoiceActionsOpen] = useState(false);
@@ -1637,6 +1749,10 @@ export default function OwnerPage() {
   }
 
   function handleSelectInvoice(invoice: InvoiceRow) {
+    if (isMobileInvoiceViewport && typeof window !== "undefined") {
+      mobileInvoiceScrollYRef.current = window.scrollY;
+    }
+
     const meta = {
       ...(invoice.metadata ?? {}),
       ...(invoiceMetaMap[invoice.id] ?? {}),
@@ -2475,10 +2591,6 @@ export default function OwnerPage() {
     setSmmSchedule((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   }
 
-  if (!authorized) {
-    return <div className="min-h-screen bg-black" />;
-  }
-
   const invoiceSubtotal = calcInvoiceSubtotal(invoiceDraft.items);
   const invoiceDiscount = calcInvoiceDiscount(invoiceSubtotal, invoiceDraft.discountType, invoiceDraft.discountValue);
   const invoiceTotal = calcInvoiceTotal(invoiceDraft.items, invoiceDraft.discountType, invoiceDraft.discountValue, invoiceDraft.taxType, invoiceDraft.taxValue);
@@ -2501,6 +2613,7 @@ export default function OwnerPage() {
   const selectedInvoiceDisplayMeta = selectedInvoiceRow ? inferInvoiceMeta(selectedInvoiceRow) : null;
   const selectedInvoiceVoided = selectedInvoiceId ? Boolean(invoiceMetaMap[selectedInvoiceId]?.isVoided) : false;
   const showInvoiceDetails = isCreatingInvoice || Boolean(selectedInvoiceId && selectedInvoiceRow);
+  const showMobileInvoiceDetails = showInvoiceDetails && isMobileInvoiceViewport;
   const isInvoiceEditable = isCreatingInvoice || isInvoiceEditMode;
   const selectedInvoicePaid = selectedInvoiceRow
     ? Math.max(
@@ -2512,6 +2625,182 @@ export default function OwnerPage() {
       )
     : 0;
   const selectedInvoiceRemaining = selectedInvoiceRow ? Math.max(selectedInvoiceRow.amount - selectedInvoicePaid, 0) : 0;
+  const projectsById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
+  const clientsById = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
+
+  const filteredInvoiceRows = useMemo(() => {
+    const search = deferredInvoiceSearchQuery.trim().toLowerCase();
+
+    return projectInvoices.filter((invoice) => {
+      const invoiceMeta = inferInvoiceMeta(invoice);
+      const invoiceProject = projectsById.get(invoice.project_id) ?? null;
+      const invoiceClient = invoiceProject ? clientsById.get(invoiceProject.client_id) ?? null : null;
+      const effectiveService = (invoiceMeta.serviceCategory ?? invoice.project_service ?? invoiceProject?.service ?? "website").toLowerCase();
+      const searchHaystack = [
+        invoice.invoice_number,
+        invoice.project_name ?? "",
+        invoiceClient?.brand_name ?? "",
+        invoiceClient?.username ?? "",
+        invoiceMeta.companyName ?? "",
+        invoice.metadata?.customerName ?? "",
+        invoiceMeta.projectLabel ?? "",
+        invoice.metadata?.customerEmail ?? "",
+        invoice.issue_date ?? "",
+        invoice.due_date ?? "",
+        invoice.status,
+        effectiveService,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = !search || searchHaystack.includes(search);
+      const matchesStatus = deferredInvoiceStatusFilter === "all" || invoice.status === deferredInvoiceStatusFilter;
+      const matchesService = deferredInvoiceServiceFilter === "all" || effectiveService === deferredInvoiceServiceFilter;
+
+      return matchesSearch && matchesStatus && matchesService;
+    });
+  }, [clientsById, deferredInvoiceSearchQuery, deferredInvoiceServiceFilter, deferredInvoiceStatusFilter, projectInvoices, projectsById]);
+
+  const totalInvoicePages = Math.max(1, Math.ceil(filteredInvoiceRows.length / invoicePageSize));
+  const currentInvoicePage = Math.min(invoicePage, totalInvoicePages);
+  const paginatedInvoiceRows = useMemo(() => {
+    const start = (currentInvoicePage - 1) * invoicePageSize;
+    return filteredInvoiceRows.slice(start, start + invoicePageSize);
+  }, [currentInvoicePage, filteredInvoiceRows, invoicePageSize]);
+
+  const invoiceStatusCounts = useMemo(
+    () =>
+      filteredInvoiceRows.reduce(
+        (acc, invoice) => {
+          acc.all += 1;
+          acc[invoice.status] += 1;
+          return acc;
+        },
+        { all: 0, paid: 0, unpaid: 0, partial: 0 }
+      ),
+    [filteredInvoiceRows]
+  );
+
+  const invoiceServiceOptions = useMemo(() => {
+    const serviceSet = new Set<ServiceType>();
+
+    projectInvoices.forEach((invoice) => {
+      const invoiceMeta = inferInvoiceMeta(invoice);
+      const service = (invoiceMeta.serviceCategory ?? invoice.project_service ?? "website").toLowerCase() as ServiceType;
+      serviceSet.add(service);
+    });
+
+    return Array.from(serviceSet).sort();
+  }, [projectInvoices]);
+
+  const invoiceStatusFilterLabel =
+    invoiceStatusFilter === "all"
+      ? "All statuses"
+      : invoiceStatusFilter === "paid"
+        ? "Paid"
+        : invoiceStatusFilter === "partial"
+          ? "Partial"
+          : "Unpaid";
+
+  const invoiceServiceFilterLabel = invoiceServiceFilter === "all" ? "All services" : invoiceServiceFilter.toUpperCase();
+  const invoicePageSizeLabel = `${invoicePageSize} / page`;
+  const invoiceStatusModalOptions: FilterChoice[] = [
+    { value: "all", label: "All statuses", description: `Show every invoice · ${invoiceStatusCounts.all}` },
+    { value: "paid", label: "Paid", description: `${invoiceStatusCounts.paid} invoices` },
+    { value: "partial", label: "Partial", description: `${invoiceStatusCounts.partial} invoices` },
+    { value: "unpaid", label: "Unpaid", description: `${invoiceStatusCounts.unpaid} invoices` },
+  ];
+
+  const invoiceServiceModalOptions: FilterChoice[] = [
+    { value: "all", label: "All services", description: "Show invoices from every service" },
+    ...invoiceServiceOptions.map((service) => ({
+      value: service,
+      label: service.toUpperCase(),
+      description: `Filter by ${service.toUpperCase()}`,
+    })),
+  ];
+
+  const invoicePageSizeModalOptions: FilterChoice[] = [
+    { value: "10", label: "10 / page", description: "Balanced default view" },
+    { value: "25", label: "25 / page", description: "Show more rows at once" },
+    { value: "50", label: "50 / page", description: "Maximize page density" },
+  ];
+
+  useEffect(() => {
+    setInvoicePage(1);
+  }, [invoiceSearchQuery, invoiceStatusFilter, invoiceServiceFilter, selectedClientId, selectedProjectId, invoicePageSize]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const syncViewport = () => setIsMobileInvoiceViewport(mediaQuery.matches);
+
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", syncViewport);
+      return () => mediaQuery.removeEventListener("change", syncViewport);
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!showMobileInvoiceDetails) return;
+
+    const bodyStyle = document.body.style;
+    const lockScrollY = mobileInvoiceScrollYRef.current ?? window.scrollY;
+    mobileInvoiceScrollYRef.current = lockScrollY;
+
+    const previous = {
+      position: bodyStyle.position,
+      top: bodyStyle.top,
+      left: bodyStyle.left,
+      right: bodyStyle.right,
+      width: bodyStyle.width,
+      overflow: bodyStyle.overflow,
+    };
+
+    bodyStyle.position = "fixed";
+    bodyStyle.top = `-${lockScrollY}px`;
+    bodyStyle.left = "0";
+    bodyStyle.right = "0";
+    bodyStyle.width = "100%";
+    bodyStyle.overflow = "hidden";
+
+    return () => {
+      bodyStyle.position = previous.position;
+      bodyStyle.top = previous.top;
+      bodyStyle.left = previous.left;
+      bodyStyle.right = previous.right;
+      bodyStyle.width = previous.width;
+      bodyStyle.overflow = previous.overflow;
+
+      window.scrollTo({ top: mobileInvoiceScrollYRef.current ?? 0, behavior: "auto" });
+    };
+  }, [showMobileInvoiceDetails]);
+
+  useEffect(() => {
+    if (!invoiceFilterModal) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setInvoiceFilterModal(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [invoiceFilterModal]);
+
+  useEffect(() => {
+    if (currentInvoicePage !== invoicePage) {
+      setInvoicePage(currentInvoicePage);
+    }
+  }, [currentInvoicePage, invoicePage]);
+
   const overviewProjectText = (() => {
     if (!selectedProject) return "Select a client or switch to general mode to see company-wide stats.";
     const structured = parseSmmAdminPayload(selectedProject.latest_update);
@@ -2530,7 +2819,7 @@ export default function OwnerPage() {
         : "border-white/15 bg-black/30 text-white/70 hover:border-white/25 hover:text-white"
     }`;
 
-  return (
+  return authorized ? (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.08),transparent_52%),#040404] text-white">
       <div className="relative min-h-screen w-full">
         <aside className="fixed inset-y-0 left-0 z-30 hidden h-screen w-[288px] flex-col overflow-y-auto border-r border-white/10 bg-[#090909]/95 px-5 py-6 backdrop-blur lg:flex xl:w-[320px]">
@@ -2827,7 +3116,7 @@ export default function OwnerPage() {
                 layout
                 className={`grid gap-6 ${
                   showInvoiceDetails
-                    ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]"
+                    ? "lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]"
                     : "lg:grid-cols-1"
                 }`}
               >
@@ -2835,31 +3124,178 @@ export default function OwnerPage() {
                 <motion.div
                   layout
                   transition={{ type: "spring", stiffness: 220, damping: 28 }}
-                  className="min-w-0 rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+                  className={`min-w-0 rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] ${showMobileInvoiceDetails ? "hidden lg:block" : ""}`}
                 >
                   <div className="p-6">
-                    <div className="flex items-center justify-between gap-3 mb-6">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Invoice results · active client</p>
-                        <p className="mt-1 text-2xl font-semibold tracking-tight text-white">{projectInvoices.length} invoices</p>
+                    <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                      <div className="min-w-0 flex-1 space-y-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Invoice results · {isGeneralMode ? "general view" : "active client"}</p>
+                            <p className="mt-1 text-2xl font-semibold tracking-tight text-white">{filteredInvoiceRows.length} invoices</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleStartCreateInvoice}
+                            className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 bg-gradient-to-r from-white/15 via-white/10 to-white/5 px-5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/15 hover:shadow-[0_16px_40px_rgba(0,0,0,0.35)] active:translate-y-0 active:scale-[0.99] sm:self-start"
+                          >
+                            + New invoice
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 rounded-[28px] border border-white/10 bg-white/[0.03] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:grid-cols-2 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.72fr)]">
+                          <label className="group flex h-12 min-w-0 items-center gap-2 rounded-2xl border border-white/10 bg-black/35 px-3 text-sm text-white/65 transition-all duration-200 hover:border-white/20 hover:bg-black/45 focus-within:border-white/25 focus-within:bg-black/50 focus-within:ring-2 focus-within:ring-white/10 sm:col-span-2 xl:col-span-1">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/55">
+                              <MagnifyingGlass className="h-4 w-4" weight="bold" />
+                            </span>
+                            <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">Search</span>
+                            <input
+                              value={invoiceSearchQuery}
+                              onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                              placeholder="Invoice, client, project, date..."
+                              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/30"
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => setInvoiceFilterModal("status")}
+                            className="flex h-12 min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/35 px-3 text-left text-sm text-white transition-all duration-200 hover:border-white/20 hover:bg-black/45 hover:shadow-[0_12px_30px_rgba(0,0,0,0.22)] focus:border-white/25 focus:bg-black/50 sm:col-span-1"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/55">
+                                <FunnelSimple className="h-4 w-4" weight="bold" />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block text-[10px] uppercase tracking-[0.14em] text-white/35">Status</span>
+                                <span className="block truncate font-medium text-white/90">{invoiceStatusFilterLabel}</span>
+                              </span>
+                            </span>
+                            <CaretDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${invoiceFilterModal === "status" ? "rotate-180" : ""}`} weight="bold" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setInvoiceFilterModal("service")}
+                            className="flex h-12 min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/35 px-3 text-left text-sm text-white transition-all duration-200 hover:border-white/20 hover:bg-black/45 hover:shadow-[0_12px_30px_rgba(0,0,0,0.22)] focus:border-white/25 focus:bg-black/50 sm:col-span-1"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/55">
+                                <SlidersHorizontal className="h-4 w-4" weight="bold" />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block text-[10px] uppercase tracking-[0.14em] text-white/35">Service</span>
+                                <span className="block truncate font-medium text-white/90">{invoiceServiceFilterLabel}</span>
+                              </span>
+                            </span>
+                            <CaretDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${invoiceFilterModal === "service" ? "rotate-180" : ""}`} weight="bold" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setInvoiceFilterModal("pageSize")}
+                            className="flex h-12 min-w-0 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/35 px-3 text-left text-sm text-white transition-all duration-200 hover:border-white/20 hover:bg-black/45 hover:shadow-[0_12px_30px_rgba(0,0,0,0.22)] focus:border-white/25 focus:bg-black/50 sm:col-span-2 xl:col-span-1"
+                          >
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-white/55">
+                                <CaretDown className="h-4 w-4 rotate-90" weight="bold" />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block text-[10px] uppercase tracking-[0.14em] text-white/35">Rows</span>
+                                <span className="block truncate font-medium text-white/90">{invoicePageSizeLabel}</span>
+                              </span>
+                            </span>
+                            <CaretDown className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${invoiceFilterModal === "pageSize" ? "rotate-180" : ""}`} weight="bold" />
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {[
+                            { key: "all", label: `All · ${invoiceStatusCounts.all}` },
+                            { key: "paid", label: `Paid · ${invoiceStatusCounts.paid}` },
+                            { key: "partial", label: `Partial · ${invoiceStatusCounts.partial}` },
+                            { key: "unpaid", label: `Unpaid · ${invoiceStatusCounts.unpaid}` },
+                          ].map((chip) => {
+                            const isActive = invoiceStatusFilter === chip.key;
+                            return (
+                              <button
+                                key={chip.key}
+                                type="button"
+                                onClick={() => {
+                                  if (invoiceStatusFilter !== chip.key) {
+                                    setInvoiceStatusFilter(chip.key as typeof invoiceStatusFilter);
+                                  }
+                                }}
+                                className={`group relative inline-flex h-9 items-center overflow-hidden rounded-full border px-4 text-xs font-medium tracking-wide transition-all duration-200 active:scale-[0.98] ${
+                                  isActive
+                                    ? "border-white/30 text-black shadow-[0_10px_30px_rgba(255,255,255,0.12)]"
+                                    : "border-white/10 bg-white/[0.04] text-white/65 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                                }`}
+                              >
+                                {isActive && (
+                                  <motion.span
+                                    layoutId="invoice-status-chip-active"
+                                    transition={{ type: "spring", stiffness: 360, damping: 32, mass: 0.6 }}
+                                    className="absolute inset-0 rounded-full bg-white"
+                                  />
+                                )}
+                                <span className="relative z-10 transition-transform duration-200 group-hover:-translate-y-px">{chip.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleStartCreateInvoice}
-                        className="h-10 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold hover:bg-white/15"
-                      >
-                        + New
-                      </button>
+
+                      <FilterModal
+                        open={invoiceFilterModal === "status"}
+                        title="Status"
+                        subtitle="Choose which invoice states are visible in the list."
+                        icon={FunnelSimple}
+                        selectedValue={invoiceStatusFilter}
+                        options={invoiceStatusModalOptions}
+                        onClose={() => setInvoiceFilterModal(null)}
+                        onSelect={(value) => setInvoiceStatusFilter(value as typeof invoiceStatusFilter)}
+                      />
+
+                      <FilterModal
+                        open={invoiceFilterModal === "service"}
+                        title="Service"
+                        subtitle="Filter invoices by the linked service type."
+                        icon={SlidersHorizontal}
+                        selectedValue={invoiceServiceFilter}
+                        options={invoiceServiceModalOptions}
+                        onClose={() => setInvoiceFilterModal(null)}
+                        onSelect={(value) => setInvoiceServiceFilter(value as typeof invoiceServiceFilter)}
+                      />
+
+                      <FilterModal
+                        open={invoiceFilterModal === "pageSize"}
+                        title="Rows per page"
+                        subtitle="Set how many invoices appear before pagination kicks in."
+                        icon={CaretDown}
+                        selectedValue={String(invoicePageSize)}
+                        options={invoicePageSizeModalOptions}
+                        onClose={() => setInvoiceFilterModal(null)}
+                        onSelect={(value) => setInvoicePageSize(Number(value) || 10)}
+                      />
                     </div>
 
-                    {projectInvoices.length === 0 ? (
+                    {filteredInvoiceRows.length === 0 ? (
                       <div className="text-center text-white/55 text-sm py-6">
-                        No invoices yet for this client.
+                        No invoices match the current search and filters.
                       </div>
                     ) : (
-                      <div className="space-y-0">
-                        <AnimatePresence>
-                          {projectInvoices.map((invoice) => {
+                      <AnimatePresence initial={false} mode="wait">
+                        <motion.div
+                          key={`${deferredInvoiceStatusFilter}-${deferredInvoiceServiceFilter}-${deferredInvoiceSearchQuery}-${currentInvoicePage}-${invoicePageSize}`}
+                          initial={{ opacity: 0, y: 6, filter: "blur(1.5px)" }}
+                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                          exit={{ opacity: 0, y: -4, filter: "blur(1px)" }}
+                          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                          className="space-y-0"
+                        >
+                          {paginatedInvoiceRows.map((invoice) => {
                             const isVoided = Boolean(invoiceMetaMap[invoice.id]?.isVoided);
                             const invoiceMeta = inferInvoiceMeta(invoice);
                             const rowPaid = Math.max(
@@ -2873,22 +3309,55 @@ export default function OwnerPage() {
                             return (
                               <motion.button
                                 key={invoice.id}
-                                layout
-                                initial={{ opacity: 0, y: 10, scale: 0.99 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.99 }}
-                                transition={{ duration: 0.2, ease: "easeOut" }}
-                                whileHover={{ y: -2, scale: 1.003 }}
+                                whileHover={{ y: -1, scale: 1.001 }}
                                 whileTap={{ scale: 0.998 }}
                                 type="button"
                                 onClick={() => handleSelectInvoice(invoice)}
+                                onMouseMove={(event) => {
+                                  const rect = event.currentTarget.getBoundingClientRect();
+                                  const x = event.clientX - rect.left;
+                                  const y = event.clientY - rect.top;
+                                  const centerX = rect.width / 2;
+                                  const centerY = rect.height / 2;
+                                  const dx = x - centerX;
+                                  const dy = y - centerY;
+                                  const maxDistance = Math.hypot(centerX, centerY) || 1;
+                                  const distanceRatio = Math.min(1, Math.hypot(dx, dy) / maxDistance);
+                                  const focus = 1 - distanceRatio;
+
+                                  const glowWidth = 110 + focus * 180;
+                                  const glowHeight = 42 + focus * 82;
+                                  const strongOpacity = 0.03 + focus * 0.07;
+                                  const softOpacity = 0.012 + focus * 0.035;
+
+                                  event.currentTarget.style.setProperty("--mx", `${x}px`);
+                                  event.currentTarget.style.setProperty("--my", `${y}px`);
+                                  event.currentTarget.style.setProperty("--glow-w", `${glowWidth}px`);
+                                  event.currentTarget.style.setProperty("--glow-h", `${glowHeight}px`);
+                                  event.currentTarget.style.setProperty("--fade-strong", String(strongOpacity));
+                                  event.currentTarget.style.setProperty("--fade-soft", String(softOpacity));
+                                }}
+                                onMouseLeave={(event) => {
+                                  event.currentTarget.style.setProperty("--mx", "50%");
+                                  event.currentTarget.style.setProperty("--my", "50%");
+                                  event.currentTarget.style.setProperty("--glow-w", "170px");
+                                  event.currentTarget.style.setProperty("--glow-h", "70px");
+                                  event.currentTarget.style.setProperty("--fade-strong", "0.07");
+                                  event.currentTarget.style.setProperty("--fade-soft", "0.03");
+                                }}
                                 className={`group relative w-full overflow-hidden border-b px-2 py-4 text-left transition-all duration-300 last:border-b-0 ${
                                   selectedInvoiceId === invoice.id
                                     ? "border-white/25 bg-white/[0.05]"
                                     : "border-white/10 hover:border-white/25"
                                 }`}
                               >
-                                <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/[0.02] via-white/[0.04] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                                <span
+                                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                                  style={{
+                                    background:
+                                      "radial-gradient(ellipse var(--glow-w,170px) var(--glow-h,70px) at var(--mx,50%) var(--my,50%), rgba(255,255,255,var(--fade-strong,0.07)) 0%, rgba(255,255,255,var(--fade-soft,0.03)) 38%, rgba(255,255,255,0.012) 56%, transparent 74%)",
+                                  }}
+                                />
                                 <div className="flex items-center justify-between gap-4">
                                   <div className="min-w-0 flex-1">
                                     <h3 className="truncate text-xl font-semibold tracking-tight text-white">{invoice.invoice_number}</h3>
@@ -2922,7 +3391,36 @@ export default function OwnerPage() {
                               </motion.button>
                             );
                           })}
-                        </AnimatePresence>
+                        </motion.div>
+                      </AnimatePresence>
+                    )}
+
+                    {filteredInvoiceRows.length > 0 && (
+                      <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-white/55">
+                          Showing {Math.min(filteredInvoiceRows.length, (currentInvoicePage - 1) * invoicePageSize + 1)}–{Math.min(filteredInvoiceRows.length, currentInvoicePage * invoicePageSize)} of {filteredInvoiceRows.length}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setInvoicePage((prev) => Math.max(1, prev - 1))}
+                            disabled={currentInvoicePage <= 1}
+                            className="h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Prev
+                          </button>
+                          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/70">
+                            Page {currentInvoicePage} / {totalInvoicePages}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setInvoicePage((prev) => Math.min(totalInvoicePages, prev + 1))}
+                            disabled={currentInvoicePage >= totalInvoicePages}
+                            className="h-10 rounded-xl border border-white/15 bg-white/5 px-3 text-sm font-semibold text-white/80 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            Next
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2933,12 +3431,29 @@ export default function OwnerPage() {
                   {showInvoiceDetails ? (
                     <motion.div
                       key="invoice-details"
-                      initial={{ opacity: 0, x: 24 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 24 }}
-                      transition={{ type: "spring", stiffness: 260, damping: 28 }}
-                      className="min-w-0 rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] overflow-hidden flex flex-col"
+                      initial={showMobileInvoiceDetails ? { opacity: 0, y: 22 } : { opacity: 0, x: 24 }}
+                      animate={showMobileInvoiceDetails ? { opacity: 1, y: 0 } : { opacity: 1, x: 0 }}
+                      exit={showMobileInvoiceDetails ? { opacity: 0, y: 22 } : { opacity: 0, x: 24 }}
+                      transition={showMobileInvoiceDetails ? { duration: 0.22, ease: [0.22, 1, 0.36, 1] } : { type: "spring", stiffness: 260, damping: 28 }}
+                      className={`min-w-0 overflow-hidden flex flex-col ${
+                        showMobileInvoiceDetails
+                          ? "fixed inset-0 z-[75] rounded-none border-0 bg-[#070707] shadow-none lg:static lg:z-auto lg:rounded-[32px] lg:border lg:border-white/10 lg:bg-black/95 lg:shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+                          : "rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
+                      }`}
                     >
+                      {showMobileInvoiceDetails && (
+                        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#0b0b0b]/95 px-4 py-3 backdrop-blur lg:hidden">
+                          <button
+                            type="button"
+                            onClick={resetInvoiceDraft}
+                            className="inline-flex h-10 items-center rounded-full border border-white/15 bg-white/[0.05] px-4 text-sm font-semibold text-white/85 hover:border-white/25 hover:bg-white/[0.12]"
+                          >
+                            ← Back
+                          </button>
+                          <p className="text-sm font-medium text-white/75">Invoice details</p>
+                        </div>
+                      )}
+
                       <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
                         <div>
                           <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">Modern Invoice Details</p>
@@ -2955,7 +3470,7 @@ export default function OwnerPage() {
                             onClick={() => {
                               resetInvoiceDraft();
                             }}
-                            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                            className="hidden h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white/70 hover:border-white/20 hover:bg-white/10 hover:text-white lg:inline-flex"
                           >
                             Back
                           </button>
@@ -3193,7 +3708,7 @@ export default function OwnerPage() {
                           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">Line items</p>
                             {isInvoiceEditable && (
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={handleAddInvoiceItem}
@@ -3204,7 +3719,7 @@ export default function OwnerPage() {
                                 <select
                                   value={selectedExistingLabelId}
                                   onChange={(e) => setSelectedExistingLabelId(e.target.value)}
-                                  className="h-8 rounded-lg border border-white/12 bg-black/35 px-2 text-xs outline-none"
+                                  className="h-8 min-w-[128px] rounded-lg border border-white/12 bg-black/35 px-2 text-xs outline-none"
                                 >
                                   <option value="">Select saved</option>
                                   {invoiceLabels.map((label) => (
@@ -3221,7 +3736,7 @@ export default function OwnerPage() {
                               </div>
                             )}
                           </div>
-                          <div className="border-b border-white/10 bg-white/[0.03] px-4 py-2.5 text-[11px] uppercase tracking-[0.12em] text-white/50">
+                          <div className="hidden border-b border-white/10 bg-white/[0.03] px-4 py-2.5 text-[11px] uppercase tracking-[0.12em] text-white/50 sm:block">
                             <div className="grid grid-cols-[minmax(0,1fr)_84px_116px_116px] gap-3">
                               <span>Description</span>
                               <span>Qty</span>
@@ -3234,45 +3749,111 @@ export default function OwnerPage() {
                             {invoiceDraft.items.map((item) => (
                               isInvoiceEditable ? (
                                 <SwipeRevealDeleteRow key={item.id} onDelete={() => handleRemoveInvoiceItem(item.id)}>
-                                  <div className="grid grid-cols-[minmax(0,1fr)_84px_116px_116px] items-center gap-3 px-3 py-2.5">
-                                    <input
-                                      value={item.description}
-                                      onChange={(e) => {
-                                        const nextDescription = e.target.value;
-                                        const matched = invoiceLabels.find((label) => label.title.toLowerCase() === nextDescription.trim().toLowerCase());
-                                        handleUpdateInvoiceItem(item.id, {
-                                          description: nextDescription,
-                                          ...(matched ? { rate: matched.rate } : {}),
-                                        });
-                                      }}
-                                      list="owner-invoice-label-options"
-                                      placeholder="Item description"
-                                      className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                                    />
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={numberInputValue(item.quantity)}
-                                      onChange={(e) => handleUpdateInvoiceItem(item.id, { quantity: parseNumberInput(e.target.value) })}
-                                      className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                                    />
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      value={numberInputValue(item.rate)}
-                                      onChange={(e) => handleUpdateInvoiceItem(item.id, { rate: parseNumberInput(e.target.value) })}
-                                      className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
-                                    />
-                                    <p className="text-right text-sm font-semibold text-white">₼{(item.quantity * item.rate).toFixed(2)}</p>
+                                  <div className="px-3 py-2.5">
+                                    <div className="space-y-2 sm:hidden">
+                                      <input
+                                        value={item.description}
+                                        onChange={(e) => {
+                                          const nextDescription = e.target.value;
+                                          const matched = invoiceLabels.find((label) => label.title.toLowerCase() === nextDescription.trim().toLowerCase());
+                                          handleUpdateInvoiceItem(item.id, {
+                                            description: nextDescription,
+                                            ...(matched ? { rate: matched.rate } : {}),
+                                          });
+                                        }}
+                                        list="owner-invoice-label-options"
+                                        placeholder="Item description"
+                                        className="h-10 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <p className="mb-1 text-[10px] uppercase tracking-[0.12em] text-white/45">Qty</p>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            value={numberInputValue(item.quantity)}
+                                            onChange={(e) => handleUpdateInvoiceItem(item.id, { quantity: parseNumberInput(e.target.value) })}
+                                            className="h-10 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                          />
+                                        </div>
+                                        <div>
+                                          <p className="mb-1 text-[10px] uppercase tracking-[0.12em] text-white/45">Rate</p>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.01"
+                                            value={numberInputValue(item.rate)}
+                                            onChange={(e) => handleUpdateInvoiceItem(item.id, { rate: parseNumberInput(e.target.value) })}
+                                            className="h-10 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/35 px-3 py-2">
+                                        <span className="text-xs text-white/55">Amount</span>
+                                        <p className="text-sm font-semibold text-white">{(item.quantity * item.rate).toFixed(2)} AZN</p>
+                                      </div>
+                                    </div>
+
+                                    <div className="hidden grid-cols-[minmax(0,1fr)_84px_116px_116px] items-center gap-3 sm:grid">
+                                      <input
+                                        value={item.description}
+                                        onChange={(e) => {
+                                          const nextDescription = e.target.value;
+                                          const matched = invoiceLabels.find((label) => label.title.toLowerCase() === nextDescription.trim().toLowerCase());
+                                          handleUpdateInvoiceItem(item.id, {
+                                            description: nextDescription,
+                                            ...(matched ? { rate: matched.rate } : {}),
+                                          });
+                                        }}
+                                        list="owner-invoice-label-options"
+                                        placeholder="Item description"
+                                        className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={numberInputValue(item.quantity)}
+                                        onChange={(e) => handleUpdateInvoiceItem(item.id, { quantity: parseNumberInput(e.target.value) })}
+                                        className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={numberInputValue(item.rate)}
+                                        onChange={(e) => handleUpdateInvoiceItem(item.id, { rate: parseNumberInput(e.target.value) })}
+                                        className="h-9 w-full rounded-lg border border-white/12 bg-black/35 px-2.5 text-sm text-white outline-none hover:border-white/20 focus:border-white/30"
+                                      />
+                                      <p className="text-right text-sm font-semibold text-white">{(item.quantity * item.rate).toFixed(2)} AZN</p>
+                                    </div>
                                   </div>
                                 </SwipeRevealDeleteRow>
                               ) : (
-                                <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_84px_116px_116px] items-center gap-3 rounded-xl border border-white/10 bg-black/70 px-3 py-2.5">
-                                  <p className="truncate text-sm text-white/85">{item.description || "—"}</p>
-                                  <p className="text-sm text-white/65">{item.quantity}</p>
-                                  <p className="text-sm text-white/65">₼{item.rate.toFixed(2)}</p>
-                                  <p className="text-right text-sm font-semibold text-white">₼{(item.quantity * item.rate).toFixed(2)}</p>
+                                <div key={item.id} className="rounded-xl border border-white/10 bg-black/70 px-3 py-2.5">
+                                  <div className="space-y-2 sm:hidden">
+                                    <p className="text-sm text-white/85">{item.description || "—"}</p>
+                                    <div className="grid grid-cols-3 gap-2 text-xs text-white/65">
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">Qty</p>
+                                        <p className="mt-1 text-sm text-white/80">{item.quantity}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">Rate</p>
+                                        <p className="mt-1 text-sm text-white/80">{item.rate.toFixed(2)} AZN</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">Amount</p>
+                                        <p className="mt-1 text-sm font-semibold text-white">{(item.quantity * item.rate).toFixed(2)} AZN</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="hidden grid-cols-[minmax(0,1fr)_84px_116px_116px] items-center gap-3 sm:grid">
+                                    <p className="truncate text-sm text-white/85">{item.description || "—"}</p>
+                                    <p className="text-sm text-white/65">{item.quantity}</p>
+                                    <p className="text-sm text-white/65">{item.rate.toFixed(2)} AZN</p>
+                                    <p className="text-right text-sm font-semibold text-white">{(item.quantity * item.rate).toFixed(2)} AZN</p>
+                                  </div>
                                 </div>
                               )
                             ))}
@@ -4411,5 +4992,7 @@ export default function OwnerPage() {
         </main>
       </div>
     </div>
+  ) : (
+    <div className="min-h-screen bg-black" />
   );
 }
