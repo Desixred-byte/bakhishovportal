@@ -541,6 +541,8 @@ export default function InvoicesPage() {
   const [activeInvoiceId, setActiveInvoiceId] = useState<string | null>(null);
   const [isInvoiceListMinimized, setIsInvoiceListMinimized] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [openFilter, setOpenFilter] = useState<"service" | "project" | "status" | "date" | null>(null);
   const filterBarRef = useRef<HTMLDivElement>(null);
 
@@ -733,6 +735,32 @@ export default function InvoicesPage() {
     { value: "partial", label: copy.partial },
     { value: "unpaid", label: copy.unpaid },
   ];
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(max-width: 1023px)");
+    const updateViewport = () => {
+      setIsCompactViewport(media.matches);
+      setIsMobileFiltersOpen(!media.matches);
+    };
+
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isCompactViewport) {
+      setIsInvoiceListMinimized(false);
+      return;
+    }
+
+    if (activeInvoiceId) {
+      setIsInvoiceListMinimized(true);
+    }
+  }, [activeInvoiceId, isCompactViewport]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -1059,8 +1087,8 @@ export default function InvoicesPage() {
 
         {!activeInvoiceRecord && (
         <>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-white/12 bg-black/70 p-6 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+        <div className="-mx-1 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:overflow-visible sm:px-0 sm:pb-0 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.visibleInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1075,7 +1103,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="rounded-3xl border border-white/12 bg-black/70 p-6 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.openBalance}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1090,7 +1118,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="rounded-3xl border border-amber-400/20 bg-amber-400/12 p-6 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          <div className="min-w-[220px] snap-start rounded-3xl border border-amber-400/20 bg-amber-400/12 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.paidTotal}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1105,7 +1133,7 @@ export default function InvoicesPage() {
               </motion.p>
             </AnimatePresence>
           </div>
-          <div className="rounded-3xl border border-white/12 bg-black/70 p-6 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          <div className="min-w-[220px] snap-start rounded-3xl border border-white/12 bg-black/70 p-5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:min-w-0 sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.14em] text-white/45">{copy.overdueInvoices}</p>
             <AnimatePresence mode="wait" initial={false}>
               <motion.p
@@ -1133,6 +1161,15 @@ export default function InvoicesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMobileFiltersOpen((value) => !value)}
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/20 bg-black/40 px-4 text-sm font-semibold text-white/90 sm:hidden"
+              >
+                {copy.show} {copy.filters}
+                <CaretDown className={`h-4 w-4 transition-transform duration-200 ${isMobileFiltersOpen ? "rotate-180" : ""}`} />
+              </button>
+
               <button
                 type="button"
                 onClick={() => downloadFilteredReportPdf(filteredInvoices)}
@@ -1170,7 +1207,13 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
+          <motion.div
+            initial={false}
+            animate={isMobileFiltersOpen ? { opacity: 1, height: "auto", marginTop: 16 } : { opacity: 0, height: 0, marginTop: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden sm:!opacity-100 sm:!h-auto sm:!mt-4"
+          >
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_minmax(0,1.05fr)]">
             <div className="relative min-w-0">
               <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" weight="bold" />
               <input
@@ -1290,6 +1333,7 @@ export default function InvoicesPage() {
               </AnimatePresence>
             </div>
           </div>
+          </motion.div>
         </div>
         </>
         )}
@@ -1308,7 +1352,7 @@ export default function InvoicesPage() {
           <motion.div
             layout
             transition={{ type: "spring", stiffness: 220, damping: 28 }}
-            className={`min-w-0 rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] transition-[padding] duration-300 ease-out ${activeInvoiceRecord ? "xl:h-full xl:min-h-0 xl:flex xl:flex-col" : ""} ${isInvoiceListMinimized ? "p-3" : "p-6"}`}
+            className={`min-w-0 rounded-[32px] border border-white/10 bg-black/95 shadow-[0_30px_80px_rgba(0,0,0,0.45)] transition-[padding] duration-300 ease-out ${activeInvoiceRecord ? "xl:h-full xl:min-h-0 xl:flex xl:flex-col" : ""} ${isInvoiceListMinimized ? "p-3" : "p-4 sm:p-6"}`}
           >
             <div className="flex items-center justify-between gap-3">
               <AnimatePresence initial={false}>
@@ -1397,15 +1441,15 @@ export default function InvoicesPage() {
                           whileTap={{ scale: 0.998 }}
                           type="button"
                           onClick={() => setActiveInvoiceId(record.invoice.id)}
-                          className="group relative w-full overflow-hidden border-b border-white/10 px-2 py-4 text-left transition-all duration-300 hover:border-white/25"
+                          className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3.5 text-left transition-all duration-300 hover:border-white/25 sm:px-4"
                         >
                           <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/[0.02] via-white/[0.04] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                          <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <div className="min-w-0">
-                              <h3 title={getInvoiceProjectLabel(record)} className="truncate text-xl font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white">
+                              <h3 title={getInvoiceProjectLabel(record)} className="truncate text-base font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white sm:text-xl">
                                 {getInvoiceProjectLabel(record)}
                               </h3>
-                              <p className="mt-1 text-sm text-white/55 transition-colors duration-300 group-hover:text-white/75">
+                              <p className="mt-1 text-xs text-white/55 transition-colors duration-300 group-hover:text-white/75 sm:text-sm">
                                 {record.invoice.invoiceNumber} · {formatDate(record.invoice.issueDate)}
                               </p>
                               <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-white/40 transition-colors duration-300 group-hover:text-white/60">
@@ -1413,15 +1457,17 @@ export default function InvoicesPage() {
                               </p>
                             </div>
 
-                            <div className="relative z-[1] text-right">
-                              <p className="text-3xl font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white">{formatAzn(record.invoice.amount)}</p>
+                            <div className="relative z-[1] flex items-end justify-between gap-4 sm:block sm:text-right">
+                              <p className="text-2xl font-semibold tracking-tight text-white transition-colors duration-300 group-hover:text-white sm:text-3xl">{formatAzn(record.invoice.amount)}</p>
+                              <div className="text-right sm:text-right">
                               <span
                                 className={`mt-2 inline-flex rounded-full border px-3 py-1 text-xs font-medium capitalize ${statusStyles[record.invoice.status]}`}
                               >
                                 {getStatusLabel(record.invoice.status)}
                               </span>
-                              <p className="mt-2 text-[11px] text-white/60">Paid: {formatAzn(rowPaid)}</p>
+                              <p className="mt-1.5 text-[11px] text-white/60">Paid: {formatAzn(rowPaid)}</p>
                               <p className="text-[11px] text-white/45">Remaining: {formatAzn(rowBalance)}</p>
+                              </div>
                             </div>
                           </div>
                         </motion.button>
@@ -1439,9 +1485,9 @@ export default function InvoicesPage() {
             {activeInvoiceRecord && (
               <motion.aside
                 key="invoice-details-panel"
-                initial={{ opacity: 0, x: 24 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 24 }}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 18 }}
                 transition={{ type: "spring", stiffness: 260, damping: 28 }}
                 className="min-w-0 xl:h-full xl:min-h-0"
               >
@@ -1452,10 +1498,10 @@ export default function InvoicesPage() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -8, scale: 0.995 }}
                     transition={{ duration: 0.24, ease: "easeOut" }}
-                    className="min-h-0 min-w-0 h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth pr-1 pb-4 [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/30"
+                    className="min-h-0 min-w-0 h-full space-y-4 overflow-y-auto overscroll-contain scroll-smooth pb-4 sm:pr-1 [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 hover:[&::-webkit-scrollbar-thumb]:bg-white/30"
                   >
-                  <div className="rounded-[32px] border border-white/10 bg-black/95 p-5 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-                      <div className="flex items-start justify-between gap-3">
+                  <div className="rounded-[32px] border border-white/10 bg-black/95 p-4 shadow-[0_30px_80px_rgba(0,0,0,0.45)] sm:p-5">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{copy.modalTitle}</p>
                           <h3 className="mt-2 text-xl font-semibold tracking-tight text-white capitalize">
@@ -1465,7 +1511,7 @@ export default function InvoicesPage() {
                             Due {formatDate(activeInvoiceRecord.invoice.dueDate)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex w-full items-center gap-2 sm:w-auto">
                           <motion.button
                             type="button"
                             onClick={handleDownloadPdf}
@@ -1473,7 +1519,7 @@ export default function InvoicesPage() {
                             whileHover={{ y: -1.5, scale: 1.02 }}
                             whileTap={{ scale: 0.985 }}
                             transition={{ type: "spring", stiffness: 360, damping: 24 }}
-                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/20 bg-black/45 px-4 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(0,0,0,0.35)] transition-all duration-200 hover:border-white/30 hover:bg-black/60 disabled:cursor-not-allowed disabled:opacity-80"
+                            className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-xl border border-white/20 bg-black/45 px-3 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(0,0,0,0.35)] transition-all duration-200 hover:border-white/30 hover:bg-black/60 disabled:cursor-not-allowed disabled:opacity-80 sm:flex-none sm:px-4"
                           >
                             <DownloadSimple className={`h-4 w-4 ${isDownloadingPdf ? "animate-spin" : ""}`} weight="bold" />
                             <span>{isDownloadingPdf ? copy.preparing : copy.downloadPdf}</span>
@@ -1484,7 +1530,7 @@ export default function InvoicesPage() {
                               setActiveInvoiceId(null);
                               setIsInvoiceListMinimized(false);
                             }}
-                            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white/70 transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white/70 transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white"
                             aria-label="Back to invoice list"
                           >
                             <span>{copy.back}</span>
