@@ -19,6 +19,11 @@ export const metadata: Metadata = {
     template: "%s · Bakhishov Brands",
   },
   description: "Bakhishov Brands client portal for project progress, invoices, deliverables, and support in one secure workspace.",
+  icons: {
+    icon: "/BAKHISHOV.png",
+    shortcut: "/BAKHISHOV.png",
+    apple: "/BAKHISHOV.png",
+  },
   openGraph: {
     title: "Bakhishov Brands Portal",
     description: "Track project progress, invoices, deliverables, and updates in one premium portal experience.",
@@ -26,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "Bakhishov Brands",
     images: [
       {
-        url: "/webthumb.png",
+        url: "https://app.bakhishov.com/webthumb.png",
         width: 1200,
         height: 630,
         alt: "Bakhishov Brands Portal",
@@ -39,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Bakhishov Brands Portal",
     description: "Track project progress, invoices, deliverables, and updates in one premium workspace.",
-    images: ["/webthumb.png"],
+    images: ["https://app.bakhishov.com/webthumb.png"],
   },
 };
 
