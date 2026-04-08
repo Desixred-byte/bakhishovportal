@@ -879,9 +879,9 @@ export default function InvoicesPage() {
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
-    doc.text(`Nömrə: ${invoice.invoiceNumber}`, margin + 26, margin + 165);
-    doc.text(`Tarix: ${formatDate(invoice.issueDate)}`, margin + 26, margin + 182);
-    doc.text(`Son tarix: ${formatDate(invoice.dueDate)}`, margin + 26, margin + 199);
+    doc.text(`Nömrə: ${invoice.invoiceNumber}`, pageWidth - margin - 220, margin + 100);
+    doc.text(`Tarix: ${formatDate(invoice.issueDate)}`, pageWidth - margin - 220, margin + 117);
+    doc.text(`Son tarix: ${formatDate(invoice.dueDate)}`, pageWidth - margin - 220, margin + 134);
 
     const infoY = margin + 190;
     const cardHeight = 96;
