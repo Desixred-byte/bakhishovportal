@@ -869,18 +869,19 @@ export default function InvoicesPage() {
     doc.text("sales@bakhishov.com", margin + 26, margin + 148);
 
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(pageWidth - margin - 122, margin + 28, 92, 26, 13, 13, "F");
+    doc.roundedRect(pageWidth - margin - 136, margin + 28, 106, 32, 13, 13, "F");
     doc.setTextColor(...lineStrong);
     doc.setFont(pdfFont, "bold");
-    doc.setFontSize(10);
-    doc.text(getPdfDisplayStatus(invoice.status).toUpperCase(), pageWidth - margin - 102, margin + 45);
+    doc.setFontSize(8);
+    const statusText = getPdfDisplayStatus(invoice.status).toUpperCase();
+    doc.text(statusText, pageWidth - margin - 122, margin + 47, { align: "center", maxWidth: 90 });
 
     doc.setFont(pdfFont, "bold");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
-    doc.text(`Nömrə: ${invoice.invoiceNumber}`, pageWidth - margin - 220, margin + 75);
-    doc.text(`Tarix: ${formatDate(invoice.issueDate)}`, pageWidth - margin - 220, margin + 92);
-    doc.text(`Son tarix: ${formatDate(invoice.dueDate)}`, pageWidth - margin - 220, margin + 109);
+    doc.text(`Nömrə: ${invoice.invoiceNumber}`, pageWidth - margin - 238, margin + 75);
+    doc.text(`Tarix: ${formatDate(invoice.issueDate)}`, pageWidth - margin - 238, margin + 92);
+    doc.text(`Son tarix: ${formatDate(invoice.dueDate)}`, pageWidth - margin - 238, margin + 109);
 
     const infoY = margin + 190;
     const cardHeight = 96;
