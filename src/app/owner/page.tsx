@@ -9,7 +9,7 @@ import { formatAzn } from "@/lib/currency";
 import type { ProjectStatus, ServiceType } from "@/lib/types";
 
 type OwnerLanguage = "en" | "ru" | "az";
-type OwnerTab = "overview" | "status" | "invoices" | "materials" | "smm" | "profiles" | "labels" | "security" | "setup";
+type OwnerTab = "overview" | "projects" | "invoices" | "materials" | "smm" | "clients" | "line-items" | "security" | "system";
 
 type SmmDraft = {
   cadence: string;
@@ -186,7 +186,7 @@ const serviceOptions: ServiceType[] = ["website", "smm", "software", "app", "bra
 type InvoiceServiceFilter = "all" | ServiceType | "misc";
 const projectStatusOptions: ProjectStatus[] = ["planning", "in_progress", "review", "delivered"];
 const invoiceStatusOptions = ["unpaid", "partial", "paid"] as const;
-const tabs: OwnerTab[] = ["overview", "status", "invoices", "materials", "smm", "profiles", "security", "setup"];
+const tabs: OwnerTab[] = ["overview", "projects", "invoices", "materials", "smm", "clients", "security", "system"];
 
 const copy: Record<OwnerLanguage, Record<string, string>> = {
   en: {
@@ -198,18 +198,18 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     noClients: "No clients found.",
     noProjects: "No projects for this client yet.",
     logout: "Logout",
-    clients: "Clients",
-    projects: "Projects",
+    clientsContext: "Clients",
+    projectsContext: "Projects",
     avgProjects: "Avg projects/client",
-    overview: "Overview",
-    profiles: "Profiles",
-    labels: "Labels",
-    status: "Status",
+    overview: "Company overview",
+    clients: "Clients",
+    lineItems: "Line Item Presets",
+    projects: "Projects",
     invoices: "Invoices",
     materials: "Materials",
     smm: "SMM",
     security: "Security",
-    setup: "Setup",
+    system: "System",
     saveChanges: "Save changes",
     addInvoice: "Add invoice",
     addMaterial: "Add material",
@@ -236,18 +236,18 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     noClients: "Клиенты не найдены.",
     noProjects: "У этого клиента пока нет проектов.",
     logout: "Выйти",
-    clients: "Клиенты",
-    projects: "Проекты",
+    clientsContext: "Клиенты",
+    projectsContext: "Проекты",
     avgProjects: "Среднее проектов/клиент",
-    overview: "Обзор",
-    profiles: "Профили",
-    labels: "Лейблы",
-    status: "Статус",
+    overview: "Обзор компании",
+    clients: "Клиенты",
+    lineItems: "Шаблоны позиций",
+    projects: "Проекты",
     invoices: "Счета",
     materials: "Материалы",
     smm: "SMM",
     security: "Безопасность",
-    setup: "Настройка",
+    system: "Система",
     saveChanges: "Сохранить",
     addInvoice: "Добавить счет",
     addMaterial: "Добавить материал",
@@ -274,18 +274,18 @@ const copy: Record<OwnerLanguage, Record<string, string>> = {
     noClients: "Müştəri tapılmadı.",
     noProjects: "Bu müştəri üçün hələ layihə yoxdur.",
     logout: "Çıxış",
-    clients: "Müştərilər",
-    projects: "Layihələr",
+    clientsContext: "Müştərilər",
+    projectsContext: "Layihələr",
     avgProjects: "Orta layihə/müştəri",
-    overview: "Ümumi",
-    profiles: "Profillər",
-    labels: "Etiketlər",
-    status: "Status",
+    overview: "Şirkət icmalı",
+    clients: "Müştərilər",
+    lineItems: "Sıra Maddə Şablonları",
+    projects: "Layihələr",
     invoices: "Fakturalar",
     materials: "Materiallar",
     smm: "SMM",
     security: "Təhlükəsizlik",
-    setup: "Quraşdırma",
+    system: "Sistem",
     saveChanges: "Yadda saxla",
     addInvoice: "Faktura əlavə et",
     addMaterial: "Material əlavə et",
@@ -319,22 +319,22 @@ const projectStatusLabels: Record<OwnerLanguage, Record<ProjectStatus, string>> 
 
 const ownerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
   { key: "overview", icon: House },
-  { key: "status", icon: ChartBar },
+  { key: "projects", icon: ChartBar },
   { key: "invoices", icon: FileText },
   { key: "materials", icon: Package },
   { key: "smm", icon: SpeakerHigh },
-  { key: "profiles", icon: Users },
+  { key: "clients", icon: Users },
   { key: "security", icon: ShieldCheck },
-  { key: "setup", icon: GearSix },
+  { key: "system", icon: GearSix },
 ];
 
 const generalOwnerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
   { key: "overview", icon: House },
   { key: "invoices", icon: FileText },
-  { key: "labels", icon: Package },
-  { key: "profiles", icon: Users },
+  { key: "line-items", icon: Package },
+  { key: "clients", icon: Users },
   { key: "security", icon: ShieldCheck },
-  { key: "setup", icon: GearSix },
+  { key: "system", icon: GearSix },
 ];
 
 const smmStatusOptions: SmmScheduleStatus[] = ["planned", "scheduled", "review", "done"];
@@ -4193,8 +4193,8 @@ export default function OwnerPage() {
               </motion.div>
             )}
 
-            {activeTab === "status" && (
-              <motion.div key="status" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-4">
+            {activeTab === "projects" && (
+              <motion.div key="projects" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input value={projectDraft.name} onChange={(e) => setProjectDraft((p) => ({ ...p, name: e.target.value }))} placeholder="Project name" className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none" />
                   <select value={projectDraft.service} onChange={(e) => setProjectDraft((p) => ({ ...p, service: e.target.value as ServiceType }))} className="h-11 rounded-xl border border-white/12 bg-black/40 px-3 text-sm outline-none">
@@ -5551,10 +5551,10 @@ export default function OwnerPage() {
               </motion.div>
             )}
 
-            {activeTab === "labels" && (
-              <motion.div key="labels" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
+            {activeTab === "line-items" && (
+              <motion.div key="line-items" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
                 <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                  <h3 className="text-lg font-semibold">Invoice labels</h3>
+                  <h3 className="text-lg font-semibold">Line Item Presets</h3>
                   <p className="mt-1 text-sm text-white/55">Save reusable item titles with default prices. You can add them from Invoices using “Add existing”.</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
                     <input
@@ -5702,8 +5702,8 @@ export default function OwnerPage() {
               </motion.div>
             )}
 
-            {activeTab === "setup" && (
-              <motion.div key="setup" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="grid gap-5 xl:grid-cols-2">
+            {activeTab === "system" && (
+              <motion.div key="system" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="grid gap-5 xl:grid-cols-2">
                 <section className="rounded-2xl border border-white/10 bg-black/25 p-4 xl:col-span-2">
                   <h3 className="text-lg font-semibold">Language</h3>
                   <p className="mt-1 text-sm text-white/55">Choose admin panel language.</p>
@@ -5764,8 +5764,8 @@ export default function OwnerPage() {
               </motion.div>
             )}
 
-            {activeTab === "profiles" && (
-              <motion.div key="profiles" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex min-h-0 flex-col gap-2 md:h-[calc(100vh-280px)] md:gap-3 md:overflow-hidden">
+            {activeTab === "clients" && (
+              <motion.div key="clients" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="flex min-h-0 flex-col gap-2 md:h-[calc(100vh-280px)] md:gap-3 md:overflow-hidden">
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-black/45 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
                   <div>
                     <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">Client Profiles</h2>
