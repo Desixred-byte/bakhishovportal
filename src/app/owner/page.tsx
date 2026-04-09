@@ -3909,6 +3909,48 @@ export default function OwnerPage() {
                   </div>
                 </div>
 
+                {selectedProject?.service === "smm" && (
+                  <div className="space-y-4">
+                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:p-4">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-white/45">SMM Performance Dashboard</p>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                          <p className="text-white/50">Posts Published</p>
+                          <p className="mt-1 text-xl font-semibold text-white">{smmSchedule.filter((item) => item.status === "done").length}</p>
+                          <p className="mt-1 text-xs text-white/45">Completed posts</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                          <p className="text-white/50">Pending Queue</p>
+                          <p className="mt-1 text-xl font-semibold text-white">{smmPendingCount}</p>
+                          <p className="mt-1 text-xs text-white/45">Scheduled posts</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                          <p className="text-white/50">Posting Frequency</p>
+                          <p className="mt-1 text-xl font-semibold text-white">{smmPostsPerWeek || "—"}</p>
+                          <p className="mt-1 text-xs text-white/45">Posts per week</p>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                          <p className="text-white/50">Next Scheduled</p>
+                          <p className="mt-1 text-xl font-semibold text-white">{smmAutoNextPost}</p>
+                          <p className="mt-1 text-xs text-white/45">Post time</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 rounded-xl border border-white/10 bg-black/50 p-2.5">
+                        <p className="text-xs text-white/60">
+                          <span className="font-semibold text-white">Focus: </span>
+                          {smmFocus || "No focus set"}
+                        </p>
+                        {smmManagerNote && (
+                          <p className="mt-1.5 text-xs text-white/60">
+                            <span className="font-semibold text-white">Note: </span>
+                            {smmManagerNote}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {isGeneralMode && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-[24px] border border-white/10 bg-white/[0.04] p-3 sm:gap-3 sm:p-4">
