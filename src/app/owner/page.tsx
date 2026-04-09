@@ -9,7 +9,7 @@ import { formatAzn } from "@/lib/currency";
 import type { ProjectStatus, ServiceType } from "@/lib/types";
 
 type OwnerLanguage = "en" | "ru" | "az";
-type OwnerTab = "overview" | "projects" | "invoices" | "materials" | "smm" | "clients" | "line-items" | "security" | "system";
+type OwnerTab = "overview" | "projects" | "invoices" | "materials" | "smm" | "clients" | "lineItems" | "security" | "system";
 
 type SmmDraft = {
   cadence: string;
@@ -331,7 +331,7 @@ const ownerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
 const generalOwnerTabItems: Array<{ key: OwnerTab; icon: typeof House }> = [
   { key: "overview", icon: House },
   { key: "invoices", icon: FileText },
-  { key: "line-items", icon: Package },
+  { key: "lineItems", icon: Package },
   { key: "clients", icon: Users },
   { key: "security", icon: ShieldCheck },
   { key: "system", icon: GearSix },
@@ -5551,8 +5551,8 @@ export default function OwnerPage() {
               </motion.div>
             )}
 
-            {activeTab === "line-items" && (
-              <motion.div key="line-items" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
+            {activeTab === "lineItems" && (
+              <motion.div key="lineItems" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} className="space-y-5">
                 <section className="rounded-2xl border border-white/10 bg-black/25 p-4">
                   <h3 className="text-lg font-semibold">Line Item Presets</h3>
                   <p className="mt-1 text-sm text-white/55">Save reusable item titles with default prices. You can add them from Invoices using “Add existing”.</p>
